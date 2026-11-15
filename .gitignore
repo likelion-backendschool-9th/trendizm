@@ -1,0 +1,16 @@
+# AI 에이전트 폴더: skillspector 스킬과 Gemini 설정만 커밋하고, 대화 기록 등 나머지는 모두 제외
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/skillspector
+
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/skillspector/
+
+.gemini/*
+!.gemini/settings.json
+
+# OS
+.DS_Store
