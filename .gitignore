@@ -12,5 +12,25 @@
 .gemini/*
 !.gemini/settings.json
 
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*:Zone.Identifier
+# Logs
+*.log
+
+# Configuration
+.env
+.env.*
+!.env.example
+
+# Deployment configuration is source-controlled; secrets and certificates are not.
+!.github/workflows/*.yml
+!/compose.prod.yaml
+!/backend/src/main/resources/application.yaml
+certs/
+
 # OS
 .DS_Store
