@@ -1,0 +1,130 @@
+import VideoFeed, { type FeedVideo } from "@/app/feed/_components/VideoFeed";
+
+// 와이어프레임: 피드 (숏폼)
+
+const KEYWORDS = [
+  "지브리풍 사진",
+  "AI 성우 사칭",
+  "무료 영상 생성",
+  "챗봇 오답 캡처",
+  "프롬프트 유출",
+  "AI 면접 후기",
+  "자동 자막 오역",
+  "신형 모델 공개",
+  "AI 그림 저작권",
+  "AI 광고 패러디",
+  "로봇 바리스타",
+  "컴백 티저 날짜",
+  "앵콜 라이브 논란",
+  "팬미팅 추가 좌석",
+  "직캠 100만 조회",
+  "최종화 반전 장면",
+  "쿠키 영상 해석",
+  "웹툰 캐스팅 발표",
+  "신작 서버 점검",
+  "결승 역전 골",
+  "9회말 끝내기",
+  "러닝화 재입고",
+  "성수 팝업 대기",
+  "편의점 신상빵",
+  "카페 한정 메뉴",
+  "1분 계란찜",
+  "제주 항공권 특가",
+  "캠핑장 예약 전쟁",
+  "반려견 동반 카페",
+  "올영 품절템",
+  "주가 급등 이유",
+  "한강 러닝 인증",
+  "전시 굿즈 완판",
+];
+
+const VIDEOS: FeedVideo[] = [
+  {
+    id: 1,
+    title: "ChatGPT 질문 팁",
+    platform: "YouTube",
+    duration: "00:24",
+    meta: ["채널 A", "조회 12만"],
+  },
+  {
+    id: 2,
+    title: "AI 이미지 만들기",
+    platform: "Dailymotion",
+    duration: "00:37",
+    meta: ["채널 B", "조회 8만"],
+  },
+  {
+    id: 3,
+    title: "오늘의 AI 소식",
+    platform: "Vimeo",
+    duration: "00:48",
+    meta: ["채널 C", "조회 5만"],
+  },
+  {
+    id: 4,
+    title: "새 기능 비교",
+    platform: "YouTube",
+    duration: "00:19",
+    meta: ["채널 D", "조회 3만"],
+  },
+  {
+    id: 5,
+    title: "콘텐츠 전후 비교",
+    platform: "Dailymotion",
+    duration: "00:56",
+    meta: ["채널 E", "조회 2만"],
+  },
+  {
+    id: 6,
+    title: "실무 AI 팁 3가지",
+    platform: "Vimeo",
+    duration: "00:31",
+    meta: ["채널 F", "조회 1만"],
+  },
+  {
+    id: 7,
+    title: "AI 검색 정리 팁",
+    platform: "YouTube",
+    duration: "00:43",
+    meta: ["채널 G", "조회 1만"],
+  },
+  {
+    id: 8,
+    title: "생성형 AI 활용",
+    platform: "Dailymotion",
+    duration: "00:26",
+    meta: ["채널 H", "조회 9천"],
+  },
+  {
+    id: 9,
+    title: "프롬프트 한 줄",
+    platform: "Vimeo",
+    duration: "00:29",
+    meta: ["채널 I", "조회 8천"],
+  },
+  {
+    id: 10,
+    title: "AI 영상 편집 팁",
+    platform: "YouTube",
+    duration: "00:35",
+    meta: ["채널 J", "조회 7천"],
+  },
+  {
+    id: 11,
+    title: "자동 요약 활용",
+    platform: "Dailymotion",
+    duration: "00:22",
+    meta: ["채널 K", "조회 6천"],
+  },
+  {
+    id: 12,
+    title: "AI 업무 루틴",
+    platform: "Vimeo",
+    duration: "00:44",
+    meta: ["채널 L", "조회 5천"],
+  },
+];
+
+export default function FeedShortPage() {
+  return <VideoFeed variant="short" keywords={KEYWORDS} videos={VIDEOS} />;
+}
