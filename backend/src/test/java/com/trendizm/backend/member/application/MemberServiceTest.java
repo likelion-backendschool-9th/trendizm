@@ -10,6 +10,7 @@ import com.trendizm.backend.member.application.port.MemberService;
 import com.trendizm.backend.member.application.port.out.MemberRepository;
 import com.trendizm.backend.member.domain.Role;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,13 +61,16 @@ class MemberServiceTest {
     }
 
     @Test
-    @DisplayName("여러 id로 한 번에 가져오고, 없는 id는 빠진다")
+    @DisplayName("여러 id로 한 번에 가져와 id로 꺼낼 수 있고, 없는 id는 빠진다")
     void 여러_회원_조회() {
-        List<MemberInfo> infos = memberService.getMembers(
-                List.of(idOf("member@test.com"), idOf("withdrawn@test.com"), -1L));
+        Long memberId = idOf("member@test.com");
+        Long withdrawnId = idOf("withdrawn@test.com");
 
-        assertThat(infos).extracting(MemberInfo::nickname)
-                .containsExactlyInAnyOrder("테스트회원", "탈퇴회원");
+        Map<Long, MemberInfo> infos = memberService.getMembers(List.of(memberId, withdrawnId, -1L));
+
+        assertThat(infos).hasSize(2).doesNotContainKey(-1L);
+        assertThat(infos.get(memberId).nickname()).isEqualTo("테스트회원");
+        assertThat(infos.get(withdrawnId).withdrawn()).isTrue();
     }
 
     @Test
