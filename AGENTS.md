@@ -27,7 +27,7 @@ Spring Boot 4와 Next.js 16은 이전 버전과 API가 다르다. 이전 버전 
 | `frontend/` | `npm run build` | 빌드 |
 | `frontend/` | `npm run lint` | 린트 |
 
-- 백엔드 테스트용 설정이 따로 없어서 테스트도 `backend/src/main/resources/application.yml`의 PostgreSQL에 접속한다. 로컬 PostgreSQL이나 `DB_*` 환경변수가 맞지 않으면 `contextLoads`가 실패한다. 코드가 아니라 환경 문제이니 코드를 고치지 말고 사용자에게 알린다.
+- 백엔드 테스트는 H2로 실행되어 로컬 PostgreSQL 없이 돌아간다. 설정과 규칙은 [테스트](#테스트) 섹션을 따른다.
 - `application.yml`은 gitignore 대상이다. 커밋하지 않고, 비밀번호 같은 값을 출력하거나 다른 파일로 옮기지 않는다.
 - 프론트엔드에는 테스트 스크립트가 없다.
 
@@ -55,9 +55,36 @@ com.trendizm.backend.feed
 - 요청 DTO는 `adapter/in/web/dto`, 응답 DTO는 `application/dto`에 record로 둔다. 응답은 `XxxResponse.from(entity)`로 만든다.
 - 엔티티는 `protected` 기본 생성자와 정적 팩토리 `create(...)`로 만들고, 수정은 엔티티 메서드를 호출해 변경 감지로 저장한다.
 - 서비스 클래스에는 `@Transactional(readOnly = true)`를 붙이고, 쓰기 메서드에만 `@Transactional`을 붙인다.
-- 지금은 도메인끼리 서로 import하지 않는다. 다른 도메인을 참조해야 하면 구현 전에 사용자와 방식을 정한다.
+- 다른 도메인은 in 포트(`application/port/XxxService` 인터페이스)로만 호출한다.
+- 다른 도메인의 엔티티(`domain`), 리포지토리(`port/out`, `JpaXxxRepository`), `XxxServiceImpl`은 직접 참조하지 않는다.
+- in 포트 메서드는 엔티티 대신 DTO(`application/dto`)를 주고받는다. 다른 도메인의 DTO는 import해도 된다.
+- 다른 도메인 호출은 `XxxServiceImpl`에서만 한다. 컨트롤러·어댑터에서는 호출하지 않는다.
+- 도메인끼리 서로 호출하는 순환 구조(A → B, B → A)는 만들지 않는다.
 - 로그인 없이 허용할 경로는 `auth/adapter/out/security/SecurityConfig`의 `permitAll` 목록에 추가한다. 새 API를 만들면 공개 여부를 확인한다.
 - `TODO(<도메인>)` 주석에 구현 순서가 적혀 있으면 그 순서를 따른다.
+- 위 규칙은 ArchUnit 테스트(`src/test/.../ArchitectureTest`)로 검사한다. 규칙을 어기면 `./gradlew test`가 실패한다.
+
+## 테스트
+
+- 테스트는 H2(PostgreSQL 호환 모드)로 실행해서 Docker Compose 환경이 아닌 로컬 환경에서도 `./gradlew test`를 통해 테스트를 실행할 수 있다.
+- 설정 파일: `backend/src/test/resources/application.properties` (테스트 전용이고 비밀번호 같은 민감정보 없음)
+- 테스트 이름 규칙: 메서드명은 한글 허용, `@DisplayName` 사용
+- 저장소 테스트는 `@SpringBootTest` + `@Transactional`로 테스트. 테스트가 끝나면 롤백.
+- 테스트 데이터는 테스트 클래스에서 `@Sql("/test.sql")`로 불러온다.
+
+## 초기 데이터
+
+| 파일 | 용도 |
+| --- | --- |
+| `backend/src/main/resources/data.sql` | 기능을 구현하고 로컬에서 실행할 때 필요한 초기 데이터 |
+| `backend/src/test/resources/test.sql` | 구현을 마친 기능이 정상 동작하는지 테스트할 때 쓰는 데이터 |
+
+- 테스트는 `data.sql`의 데이터에 기대지 않는다. 테스트에 필요한 데이터는 `test.sql`에 넣는다.
+- 테스트에서는 `data.sql`이 실행되지 않게 한다. H2는 내장 DB라서 기본 설정이면 `src/main/resources/data.sql`도 실행되므로, 테스트 설정에 `spring.sql.init.mode=never`를 둔다.
+- 나눈 이유:
+  - `data.sql`은 여러 사람이 같이 고치는 파일이라, 테스트가 여기에 기대면 누군가 데이터를 추가하거나 바꿀 때 관계없는 테스트가 깨진다.
+  - 테스트에 필요한 데이터를 직접 만들면, 테스트 코드만 봐도 어떤 데이터로 무엇을 검사하는지 바로 보인다.
+  - 테스트가 서로 영향을 주지 않아서, 순서나 다른 사람의 작업과 상관없이 항상 같은 결과가 나온다.
 
 ## 의존성
 
