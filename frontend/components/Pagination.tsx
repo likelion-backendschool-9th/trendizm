@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, type ReactNode } from "react";
 
 type PaginationProps = {
   // 1부터 시작하는 현재 페이지
@@ -11,9 +14,28 @@ type PaginationProps = {
 const WINDOW_SIZE = 5;
 
 // 공용 페이지네이션. 예: ‹ 1 2 3 4 5 … 10 ›
-// 페이지 번호는 현재 주소에 ?page=N을 붙인 링크로 이동한다.
+// 지금 주소의 다른 쿼리(정렬·필터·검색어)는 그대로 두고 page만 바꾼 링크로 이동한다.
 // TODO: 각 페이지에서 searchParams의 page 값을 읽어 목록을 바꾸도록 연결
-export default function Pagination({ currentPage, totalPages }: PaginationProps) {
+export default function Pagination(props: PaginationProps) {
+  // 미리 만들어 둔 HTML에서는 쿼리를 알 수 없어서, 먼저 page만 붙인 링크를 보여 준다.
+  // 브라우저에서 실제 쿼리를 읽으면 다른 조건을 유지한 링크로 바뀐다.
+  return (
+    <Suspense fallback={<PaginationLinks {...props} query="" />}>
+      <PaginationWithQuery {...props} />
+    </Suspense>
+  );
+}
+
+function PaginationWithQuery(props: PaginationProps) {
+  const searchParams = useSearchParams();
+  return <PaginationLinks {...props} query={searchParams.toString()} />;
+}
+
+function PaginationLinks({
+  currentPage,
+  totalPages,
+  query,
+}: PaginationProps & { query: string }) {
   if (totalPages < 1) {
     return null;
   }
@@ -38,29 +60,39 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
         fontSize: 13,
       }}
     >
-      <PageLink page={currentPage - 1} disabled={currentPage <= 1} label="이전 페이지">
+      <PageLink
+        query={query}
+        page={currentPage - 1}
+        disabled={currentPage <= 1}
+        label="이전 페이지"
+      >
         ‹
       </PageLink>
 
       {start > 1 && (
         <>
-          <PageLink page={1}>1</PageLink>
+          <PageLink query={query} page={1}>
+            1
+          </PageLink>
           {start > 2 && <Gap />}
         </>
       )}
       {pages.map((page) => (
-        <PageLink key={page} page={page} current={page === currentPage}>
+        <PageLink key={page} query={query} page={page} current={page === currentPage}>
           {page}
         </PageLink>
       ))}
       {end < totalPages && (
         <>
           {end < totalPages - 1 && <Gap />}
-          <PageLink page={totalPages}>{totalPages}</PageLink>
+          <PageLink query={query} page={totalPages}>
+            {totalPages}
+          </PageLink>
         </>
       )}
 
       <PageLink
+        query={query}
         page={currentPage + 1}
         disabled={currentPage >= totalPages}
         label="다음 페이지"
@@ -71,13 +103,23 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
   );
 }
 
+// 지금 쿼리를 복사한 뒤 page만 바꾼다. ?tag=a&tag=b처럼 반복되는 키도 유지된다.
+function pageHref(query: string, page: number) {
+  const params = new URLSearchParams(query);
+  params.set("page", String(page));
+  return `?${params}`;
+}
+
 function PageLink({
+  query,
   page,
   current = false,
   disabled = false,
   label,
   children,
 }: {
+  // 지금 주소의 쿼리 문자열 (? 없이)
+  query: string;
   page: number;
   current?: boolean;
   disabled?: boolean;
@@ -108,7 +150,7 @@ function PageLink({
 
   return (
     <Link
-      href={{ query: { page } }}
+      href={pageHref(query, page)}
       aria-label={label}
       aria-current={current ? "page" : undefined}
       style={style}
