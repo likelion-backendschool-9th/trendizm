@@ -12,13 +12,17 @@ public interface MemberRepository {
 
     Member save(Member member);
 
+    /** 바로 DB에 반영한다. 동시에 같은 이메일·닉네임으로 가입하면 여기서 DataIntegrityViolationException이 난다 */
+    Member saveAndFlush(Member member);
+
     Optional<Member> findById(Long id);
 
     List<Member> findAllById(Iterable<Long> ids);
 
+    /** email은 Member.normalizeEmail로 바꾼 값을 넘긴다 */
     Optional<Member> findByEmail(String email);
 
-    /** 탈퇴 회원 포함. 익명화 전(탈퇴 30일 이내)에는 같은 이메일로 다시 가입할 수 없다 */
+    /** 탈퇴 회원 포함. 익명화 전(탈퇴 30일 이내)에는 같은 이메일로 다시 가입할 수 없다. email은 normalizeEmail 값 */
     boolean existsByEmail(String email);
 
     boolean existsByNickname(String nickname);

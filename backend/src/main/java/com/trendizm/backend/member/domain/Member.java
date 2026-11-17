@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -62,9 +63,20 @@ public class Member extends BaseTimeEntity {
         this.marketingAgreed = marketingAgreed;
     }
 
-    /** 회원가입. encodedPassword는 PasswordEncoder로 암호화한 값이어야 한다 */
+    /**
+     * 회원가입. encodedPassword는 PasswordEncoder로 암호화한 값이어야 한다.
+     * 이메일은 normalizeEmail로 바꿔 저장하고, 닉네임은 앞뒤 공백을 지운다.
+     */
     public static Member create(String email, String encodedPassword, String nickname, boolean marketingAgreed) {
-        return new Member(email, encodedPassword, nickname, marketingAgreed);
+        return new Member(normalizeEmail(email), encodedPassword, nickname.strip(), marketingAgreed);
+    }
+
+    /**
+     * 이메일 비교용 표준 형태: 앞뒤 공백 제거 + 소문자.
+     * A@Test.com과 a@test.com을 같은 회원으로 본다. 이메일로 조회할 때도 이 값으로 찾는다.
+     */
+    public static String normalizeEmail(String email) {
+        return email.strip().toLowerCase(Locale.ROOT);
     }
 
     /** encodedPassword는 PasswordEncoder로 암호화한 값이어야 한다 */

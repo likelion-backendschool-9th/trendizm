@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -94,6 +95,24 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
                 .andExpect(jsonPath("$.errors[0].field").value("size"))
                 .andExpect(jsonPath("$.errors[0].message").value("size는 1 이상이어야 합니다."));
+    }
+
+    @Test
+    @DisplayName("JSON이 아닌 형식으로 보내면 415 UNSUPPORTED_MEDIA_TYPE으로 응답한다")
+    void 지원하지_않는_형식() throws Exception {
+        mockMvc.perform(post("/test/valid")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("name=abc"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    @Test
+    @DisplayName("따로 처리하지 않은 스프링 요청 오류는 500이 아니라 스프링이 정한 4xx로 응답한다")
+    void 그_외_요청_오류() throws Exception {
+        mockMvc.perform(get("/test/header"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
     }
 
     @Test
@@ -177,6 +196,10 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/test/size")
         void size(@RequestParam @Min(value = 1, message = "size는 1 이상이어야 합니다.") int size) {
+        }
+
+        @GetMapping("/test/header")
+        void header(@RequestHeader("X-Test") String value) {
         }
 
         @GetMapping("/test/forbidden")
