@@ -8,7 +8,9 @@ import com.trendizm.backend.member.application.port.MemberService;
 import com.trendizm.backend.member.application.port.out.MemberRepository;
 import com.trendizm.backend.member.domain.Member;
 import java.util.Collection;
-import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -29,13 +31,13 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
-    public List<MemberInfo> getMembers(Collection<Long> memberIds) {
+    public Map<Long, MemberInfo> getMembers(Collection<Long> memberIds) {
         if (memberIds.isEmpty()) {
-            return List.of();
+            return Map.of();
         }
         return memberRepository.findAllById(memberIds).stream()
                 .map(MemberInfo::from)
-                .toList();
+                .collect(Collectors.toMap(MemberInfo::id, Function.identity()));
     }
 
     @Override
