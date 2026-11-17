@@ -57,10 +57,15 @@ export default function PrivacyPage() {
                 type={field.type}
                 name={field.name}
                 defaultValue={field.value}
+                readOnly={field.name === "email"}
+                tabIndex={field.name === "email" ? -1 : undefined}
                 style={{
+                  pointerEvents: field.name === "email" ? "none" : undefined,
+                  userSelect: field.name === "email" ? "none" : undefined,
                   height: 42,
                   padding: "0 14px",
                   border: "1px solid #999",
+                  background: field.name === "email" ? "#f2f2f2" : "#fff",
                   fontSize: 13,
                 }}
               />
