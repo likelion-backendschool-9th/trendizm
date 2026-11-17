@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="ko" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
         {/* /admin 아래에서는 헤더와 푸터가 스스로 숨는다. */}
         {/* 둘 다 현재 주소(usePathname)를 읽는다. /lookup/[slug]처럼 주소가 요청 때 정해지는 */}
