@@ -1,0 +1,15 @@
+package com.trendizm.backend.member.application.dto;
+
+import com.trendizm.backend.member.domain.Member;
+import com.trendizm.backend.member.domain.Role;
+
+/**
+ * 다른 도메인에 넘기는 회원 정보. 비밀번호·이메일은 담지 않는다.
+ * 예: 댓글 목록에 작성자 닉네임을 보여 줄 때, withdrawn이면 "탈퇴한 회원"으로 표시한다.
+ */
+public record MemberInfo(Long id, String nickname, Role role, boolean withdrawn) {
+
+    public static MemberInfo from(Member member) {
+        return new MemberInfo(member.getId(), member.getNickname(), member.getRole(), member.isWithdrawn());
+    }
+}
