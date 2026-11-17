@@ -42,6 +42,7 @@ com.trendizm.backend.feed
 │   ├── port/FeedService.java                   유스케이스 인터페이스 (in 포트)
 │   ├── port/in/FeedServiceImpl.java            유스케이스 구현
 │   ├── port/out/FeedRepository.java            저장소 인터페이스 (out 포트)
+│   ├── exception/FeedErrorCode.java            도메인 에러 코드
 │   └── dto/FeedResponse.java                   응답 DTO
 └── adapter
     ├── in/web/FeedController.java              REST 컨트롤러
@@ -60,9 +61,26 @@ com.trendizm.backend.feed
 - in 포트 메서드는 엔티티 대신 DTO(`application/dto`)를 주고받는다. 다른 도메인의 DTO는 import해도 된다.
 - 다른 도메인 호출은 `XxxServiceImpl`에서만 한다. 컨트롤러·어댑터에서는 호출하지 않는다.
 - 도메인끼리 서로 호출하는 순환 구조(A → B, B → A)는 만들지 않는다.
-- 로그인 없이 허용할 경로는 `auth/adapter/out/security/SecurityConfig`의 `permitAll` 목록에 추가한다. 새 API를 만들면 공개 여부를 확인한다.
+- 로그인 없이 허용할 경로는 `auth/adapter/out/security/SecurityConfig`의 `permitAll` 목록에 추가한다. 새 컨트롤러를 만들면 공개 여부를 정해 `SecurityConfigTest`의 `ACCESS`에도 추가한다.
+- 컨트롤러에서 로그인 사용자가 필요하면 `@AuthenticationPrincipal(expression = "id") Long userId`로 id만 받는다. `CustomUserDetails`는 auth의 Spring Security 어댑터 구현이므로 다른 도메인에서 참조하지 않는다.
 - `TODO(<도메인>)` 주석에 구현 순서가 적혀 있으면 그 순서를 따른다.
-- 위 규칙은 ArchUnit 테스트(`src/test/.../ArchitectureTest`)로 검사한다. 규칙을 어기면 `./gradlew test`가 실패한다.
+- 위 규칙 중 변경 감지로 저장, `findByXxx` 메서드 이름, `TODO` 순서를 뺀 나머지는 테스트로 검사한다. 규칙을 어기면 `./gradlew test`가 실패한다.
+  - 구조·의존 규칙: `src/test/.../ArchitectureTest` (ArchUnit)
+  - 공개 경로 규칙: `src/test/.../auth/adapter/out/security/SecurityConfigTest`
+
+## 공통 패키지 (global)
+
+`com.trendizm.backend.global`은 도메인이 아닌 공통 패키지다(`error`: 예외·에러 응답, `response`: 공통 응답).
+
+- `global`의 하위 패키지(`global.error`, `global.response` 등)는 모든 도메인에서 import할 수 있다. `global` 패키지 바로 아래 클래스는 import하지 않는다.
+- 반대로 `global`은 도메인 패키지를 참조하지 않는다.
+- 서비스에서 예상한 실패(대상 없음, 중복, 권한 없음 등)는 `throw new BusinessException(XxxErrorCode.상수)`로 알린다. `GlobalExceptionHandler`가 `{ code, message }` 응답으로 바꾼다.
+- 에러 코드는 도메인마다 `application/exception/XxxErrorCode` enum으로 만들고 `ErrorCode`를 구현한다. 특정 도메인에 속하지 않는 실패는 `CommonErrorCode`를 쓴다.
+  - `code()`는 상수 이름을 그대로 쓰므로, `CommonErrorCode`나 다른 도메인과 겹치지 않게 짓는다. 예: `MEMBER_NOT_FOUND`
+  - 다른 도메인의 `XxxErrorCode`는 참조하지 않는다. 그 도메인의 실패는 그 도메인 서비스가 던진다.
+- `global.error.ErrorResponse`는 스프링의 `org.springframework.web.ErrorResponse`와 이름이 같다. import할 때 패키지를 확인한다.
+- 목록 응답은 Spring `Page`를 그대로 내보내지 않고 `PageResponse`로 감싼다. 엔티티를 DTO로 바꾸는 일은 `XxxServiceImpl`에서 한다. 예: `PageResponse.from(feedPage, FeedResponse::from)`
+- `global` 의존 방향과 다른 도메인 `XxxErrorCode` 참조 금지는 `ArchitectureTest`로 검사한다. 나머지 규칙은 테스트로 검사하지 않는다.
 
 ## 테스트
 
