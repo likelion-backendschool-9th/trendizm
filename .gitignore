@@ -34,6 +34,7 @@
 !.github/workflows/*.yml
 !/compose.yaml
 !/compose.prod.yaml
+!/compose.override.example.yaml
 !/backend/src/main/resources/application.yaml
 certs/
 
