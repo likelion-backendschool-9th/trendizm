@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.trendizm.backend.member.application.port.out.MemberRepository;
 import com.trendizm.backend.member.domain.Member;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,16 +16,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
-/** test.sql: member@test.com(테스트회원), withdrawn@test.com(탈퇴회원) */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-@Sql("/test.sql")
 class AuthControllerTest {
 
     @Autowired
@@ -35,6 +33,15 @@ class AuthControllerTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    /** 이미 가입한 회원 1명, 탈퇴한 회원 1명. @Transactional이라 테스트가 끝나면 롤백된다 */
+    @BeforeEach
+    void setUp() {
+        memberRepository.save(Member.create("member@test.com", "encoded-password", "테스트회원", false));
+        Member withdrawn = Member.create("withdrawn@test.com", "encoded-password", "탈퇴회원", false);
+        withdrawn.withdraw();
+        memberRepository.save(withdrawn);
+    }
 
     private ResultActions signup(String email, String password, String nickname, boolean agreeTerms)
             throws Exception {
