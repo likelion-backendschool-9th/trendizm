@@ -11,13 +11,20 @@ import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaEnumConstant;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Transient;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -162,6 +169,24 @@ class ArchitectureTest {
                 .check(classes);
     }
 
+    @Test
+    @DisplayName("엔티티는 <도메인>.domain.entity 패키지에 둔다")
+    void 엔티티_위치_규칙() {
+        classes().that().areAnnotatedWith(Entity.class)
+                .should().resideInAPackage(ROOT + ".*.domain.entity")
+                .check(classes);
+    }
+
+    @Test
+    @DisplayName("엔티티의 enum 필드는 @Enumerated(EnumType.STRING)으로 저장한다 (빠뜨리면 기본값 ORDINAL)")
+    void enum_칼럼은_STRING으로_저장한다() {
+        classes().that().areAnnotatedWith(Entity.class)
+                .or().areAnnotatedWith(MappedSuperclass.class)
+                .or().areAnnotatedWith(Embeddable.class)
+                .should(storeEnumFieldsAsString())
+                .check(classes);
+    }
+
     private static ArchCondition<JavaClass> extendOutPortOfSameDomain() {
         return new ArchCondition<>("같은 도메인의 application.port.out 인터페이스를 상속한다") {
             @Override
@@ -171,6 +196,29 @@ class ArchitectureTest {
                         .anyMatch(parent -> parent.getPackageName().equals(outPortPackage));
                 events.add(new SimpleConditionEvent(javaClass, extendsOutPort,
                         javaClass.getName() + "가 " + outPortPackage + "의 인터페이스를 상속하지 않는다"));
+            }
+        };
+    }
+
+    private static ArchCondition<JavaClass> storeEnumFieldsAsString() {
+        return new ArchCondition<>("enum 필드에 @Enumerated(EnumType.STRING)을 붙인다") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                for (JavaField field : javaClass.getFields()) {
+                    if (!field.getRawType().isEnum()
+                            || field.getModifiers().contains(JavaModifier.STATIC)
+                            || field.isAnnotatedWith(Transient.class)) {
+                        continue;
+                    }
+                    // @Enumerated를 빠뜨려도 JPA 기본값은 ORDINAL이라 같은 문제가 생긴다
+                    boolean storedAsString = field.tryGetAnnotationOfType(Enumerated.class.getName())
+                            .flatMap(annotation -> annotation.get("value"))
+                            .filter(JavaEnumConstant.class::isInstance)
+                            .map(value -> ((JavaEnumConstant) value).name().equals(EnumType.STRING.name()))
+                            .orElse(false);
+                    events.add(new SimpleConditionEvent(field, storedAsString,
+                            field.getFullName() + "에 @Enumerated(EnumType.STRING)이 없다"));
+                }
             }
         };
     }
