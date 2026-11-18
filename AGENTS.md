@@ -135,6 +135,14 @@ npm·pnpm 패키지와 Gradle 의존성도 공급망 공격 대상이다. 정상
 - 프론트엔드에서 외부 CDN의 스크립트나 스타일시트를 불러오지 않는다. 패키지로 설치하거나 직접 호스팅한다.
 - 꼭 필요하면 사용자 승인을 받고, `integrity`(SRI 해시)와 `crossorigin` 속성을 붙여 받은 파일이 바뀌면 브라우저가 실행하지 않게 한다.
 
+## 운영 배포
+
+- 운영 서버는 OpenJDK `21.0.13.1+4` 이상으로 실행한다. 그보다 낮은 버전은 [Java4Shell(CVE-2026-114938)](https://securitylabs.datadoghq.com/articles/java4shell-remote-code-execution-in-openjdk-cve-2026-114938/)에 해당한다. AVX-512 VBMI를 지원하는 x86-64 CPU에서 JDK의 Base64 디코더가 잘못된 입력을 받으면 메모리를 덮어쓴다.
+  - 컨테이너 이미지에 들어 있는 JDK도 포함한다. Dockerfile 같은 배포 설정을 추가하거나 바꿀 때 베이스 이미지의 JDK 버전을 확인한다.
+  - 버전은 셸의 `java -version`이 아니라 실행 중인 프로세스에서 `jcmd <PID> VM.version`으로 확인한다.
+- 바로 올릴 수 없으면 JVM 옵션 `-XX:-UseBASE64Intrinsics`를 붙인다. `jcmd <PID> VM.flags -all`에 `UseBASE64Intrinsics = false`가 나오면 적용된 것이다.
+- 코드 규칙([협업 규칙](#java4shellcve-2026-114938-대응))만으로는 막을 수 없다. Spring Boot 기본 설정으로 켜져 있는 multipart 요청 파싱이 로그인 없이 열린 경로에서도 각 파트의 필드 이름과 파일명을 JDK 디코더로 디코딩하기 때문이다.
+
 ## 협업 규칙
 
 브랜치, 커밋, PR, 이슈 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 따른다. 자주 틀리는 것만 요약하면 다음과 같다.
@@ -144,6 +152,16 @@ npm·pnpm 패키지와 Gradle 의존성도 공급망 공격 대상이다. 정상
 - `hotfix/`(`main`에서 분기)는 이슈 생성을 권장만 한다. 이슈 없이 브랜치를 만들고 PR을 올릴 수 있다.
 - 커밋과 PR 제목은 `<type>: <subject>` 형식이다. subject는 한국어로, 60자 이내, 마침표 없이 쓴다.
 - PR 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 따른다.
+
+### Java4Shell(CVE-2026-114938) 대응
+
+[운영 배포](#운영-배포)의 JDK 기준과 함께 지킨다.
+
+- 로컬 JDK도 `21.0.13.1+4` 이상을 쓴다. 백엔드 작업 전에 `java -version`이 이보다 낮으면 사용자에게 알린다.
+- 요청 값(헤더, 쿠키, 쿼리, 본문)을 JDK Base64 디코더(`Base64.getDecoder()`, `Base64.getUrlDecoder()`)로 디코딩하는 코드를 만들지 않는다.
+  - 직접 호출하지 않는다. JWT는 jjwt API로 다룬다. jjwt는 JDK 디코더 대신 자체 디코더를 쓴다.
+  - Spring Security의 `httpBasic`, `rememberMe`, CSRF(기본 `XorCsrfTokenRequestAttributeHandler`)는 요청 값을 JDK 디코더로 디코딩한다. 이 기능을 켜야 하면 먼저 사용자에게 알린다.
+- 로컬과 운영의 JDK가 모두 기준 버전 이상이 되면 이 항목을 지운다.
 
 ## 스킬
 
