@@ -7,8 +7,9 @@
 // - 401(로그인 만료)이면 /api/auth/reissue로 토큰을 한 번 새로 받고 원래 요청을 다시 보낸다.
 //   그래도 401이면 로그인 화면으로 보낸다(redirectOnUnauthorized: false로 끌 수 있다).
 // - 실패하면 ApiError를 던진다. code, message, errors(필드별 오류)가 들어 있다.
+//   서버에 닿지 못한 경우(네트워크 끊김 등)도 ApiError(status 0, code "NETWORK_ERROR")라서 instanceof ApiError 하나로 처리한다.
 
-import { ApiError, readErrorResponse } from "./types";
+import { ApiError, fetchOrNetworkError, readErrorResponse } from "./types";
 
 export type ApiFetchOptions = Omit<RequestInit, "body"> & {
   /** 객체를 넘기면 JSON으로 보낸다. FormData는 그대로 보낸다 */
@@ -54,7 +55,7 @@ export async function apiFetch<T = void>(path: string, options: ApiFetchOptions 
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
   const send = () =>
-    fetch(path, {
+    fetchOrNetworkError(path, {
       ...init,
       credentials: "same-origin",
       headers: {

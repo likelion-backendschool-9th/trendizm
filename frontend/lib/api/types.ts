@@ -46,14 +46,38 @@ export class ApiError extends Error {
   }
 }
 
-/** 화면의 페이지 번호(1부터)를 API의 page(0부터)로 바꾼다. 예: ?page=3 → page=2 */
-export function toApiPage(uiPage: number): number {
-  return Math.max(uiPage - 1, 0);
+/**
+ * 화면의 페이지 번호(1부터)를 API의 page(0부터)로 바꾼다. 예: ?page=3 → page=2
+ * 주소창의 ?page=abc처럼 숫자가 아니거나 1보다 작으면 첫 페이지(0)로 본다.
+ */
+export function toApiPage(uiPage: number | string | null | undefined): number {
+  const page = Math.floor(Number(uiPage));
+  return Number.isFinite(page) ? Math.max(page - 1, 0) : 0;
 }
 
 /** API의 page(0부터)를 화면의 페이지 번호(1부터)로 바꾼다 */
 export function toUiPage(apiPage: number): number {
   return apiPage + 1;
+}
+
+/** 서버에 닿지 못했을 때(네트워크 끊김, 백엔드 꺼짐 등) 던지는 에러. status는 0이다 */
+export function networkError(): ApiError {
+  return new ApiError(0, {
+    code: "NETWORK_ERROR",
+    message: "서버에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요.",
+  });
+}
+
+/** fetch를 실행하고, 네트워크 오류(TypeError)는 ApiError(NETWORK_ERROR)로 바꾼다. 요청 취소(AbortError)는 그대로 던진다 */
+export async function fetchOrNetworkError(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+    throw networkError();
+  }
 }
 
 /** 응답 본문을 ErrorResponse로 읽는다. JSON이 아니면(프록시 오류 등) 기본 메시지를 쓴다 */
