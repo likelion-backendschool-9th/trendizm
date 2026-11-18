@@ -32,8 +32,9 @@ public class PointHistory extends BaseCreatedEntity {
     @Column(nullable = false)
     private Long userId;
 
+    /** DB에는 enum 이름을 문자열로 저장한다 (ERD: varchar(30)) */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private PointType type;
 
     /** 적립은 +, 차감은 - */
