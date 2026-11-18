@@ -1,7 +1,10 @@
 package com.trendizm.backend.auth.adapter.in.web;
 
+import com.trendizm.backend.auth.adapter.in.web.dto.LoginRequest;
+import com.trendizm.backend.auth.adapter.in.web.dto.ReissueRequest;
 import com.trendizm.backend.auth.adapter.in.web.dto.SignupRequest;
 import com.trendizm.backend.auth.application.dto.AvailabilityResponse;
+import com.trendizm.backend.auth.application.dto.LoginResponse;
 import com.trendizm.backend.auth.application.port.AuthService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -16,7 +19,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 로그인 없이 모든 요청 허용 (auth/adapter/out/security/SecurityConfig의 /api/auth/**) */
+/**
+ * 로그인 없이 모든 요청 허용 (auth/adapter/out/security/SecurityConfig의 /api/auth/**).
+ * 이 API는 브라우저가 아니라 Next 서버(BFF, frontend/app/api)가 호출한다.
+ * 토큰은 응답 본문(LoginResponse)으로 주고, 쿠키 저장은 Next 서버가 한다.
+ */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -24,10 +31,12 @@ public class AuthController {
 
     private final AuthService authService;
 
+    /** 가입 후 바로 로그인 상태가 된다 */
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
-    public void signup(@Valid @RequestBody SignupRequest request) {
-        authService.signup(request.email(), request.password(), request.nickname(), request.marketingAgreed());
+    public LoginResponse signup(@Valid @RequestBody SignupRequest request) {
+        return authService.signup(
+                request.email(), request.password(), request.nickname(), request.marketingAgreed());
     }
 
     @GetMapping("/check-email")
@@ -41,5 +50,16 @@ public class AuthController {
     public AvailabilityResponse checkNickname(
             @RequestParam @NotBlank(message = "닉네임을 입력해 주세요.") String nickname) {
         return authService.checkNickname(nickname);
+    }
+
+    @PostMapping("/login")
+    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
+        return authService.login(request.email(), request.password(), request.rememberMe());
+    }
+
+    /** 액세스 토큰이 만료되면 Next 서버가 refresh 토큰을 본문에 담아 호출한다. 본문이 없거나 비어 있으면 401 */
+    @PostMapping("/reissue")
+    public LoginResponse reissue(@RequestBody(required = false) ReissueRequest request) {
+        return authService.reissue(request == null ? null : request.refreshToken());
     }
 }

@@ -63,4 +63,15 @@ class MemberTest {
 
         assertThat(member.getDeletedAt()).isEqualTo(first);
     }
+
+    @Test
+    @DisplayName("이용을 제한하면 SUSPENDED 상태가 된다")
+    void 이용_제한() {
+        Member member = Member.create("a@test.com", "encoded", "닉네임", false);
+
+        member.suspend();
+
+        assertThat(member.isSuspended()).isTrue();
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.SUSPENDED);
+    }
 }

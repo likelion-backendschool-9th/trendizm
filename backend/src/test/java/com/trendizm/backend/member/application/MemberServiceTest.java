@@ -9,7 +9,6 @@ import com.trendizm.backend.member.application.exception.MemberErrorCode;
 import com.trendizm.backend.member.application.port.MemberService;
 import com.trendizm.backend.member.application.port.out.MemberRepository;
 import com.trendizm.backend.member.domain.Member;
-import com.trendizm.backend.member.domain.Role;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +47,7 @@ class MemberServiceTest {
         MemberInfo info = memberService.getMember(idOf("member@test.com"));
 
         assertThat(info.nickname()).isEqualTo("테스트회원");
-        assertThat(info.role()).isEqualTo(Role.USER);
+        assertThat(info.role()).isEqualTo("USER");
         assertThat(info.withdrawn()).isFalse();
     }
 

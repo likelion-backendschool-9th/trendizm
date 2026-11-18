@@ -100,4 +100,13 @@ public class Member extends BaseTimeEntity {
     public boolean isWithdrawn() {
         return deletedAt != null;
     }
+
+    /** 관리자 이용 제한. 제한을 거는 API와 해제는 관리자 기능(12.x)에서 만든다 */
+    public void suspend() {
+        this.status = MemberStatus.SUSPENDED;
+    }
+
+    public boolean isSuspended() {
+        return status == MemberStatus.SUSPENDED;
+    }
 }
