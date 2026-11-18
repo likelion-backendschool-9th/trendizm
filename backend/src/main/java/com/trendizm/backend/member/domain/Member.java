@@ -51,6 +51,11 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean marketingAgreed;
 
+    /** 관리자 이용 제한 상태. 탈퇴는 deletedAt으로 따로 관리한다 */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MemberStatus status;
+
     private LocalDateTime deletedAt;
 
     private Member(String email, String password, String nickname, boolean marketingAgreed) {
@@ -60,6 +65,7 @@ public class Member extends BaseTimeEntity {
         this.role = Role.USER;
         this.notify = true;
         this.marketingAgreed = marketingAgreed;
+        this.status = MemberStatus.ACTIVE;
     }
 
     /** 회원가입. encodedPassword는 PasswordEncoder로 암호화한 값이어야 한다 */
