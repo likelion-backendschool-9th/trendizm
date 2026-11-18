@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 25 21" style="enable-background:new 0 0 25 21;" xml:space="preserve">
+<style type="text/css">
+	.outer{fill:none;stroke:#34343B;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+</style>
+<g id="food">
+	<path class="outer" d="M5.1,1c-3,1.7,2,3.4,0,5.1 M12.1,1c-3,1.7,2,3.4,0,5.1"/>
+	<path class="outer" d="M17.2,9.5h2c5.4,0,5.4,5.9,0,5.9h-2"/>
+	<path class="outer" d="M1,9.5h16.2v5.1c0,3.4-3,5.1-8.1,5.1C4,19.6,1,17.9,1,14.5V9.5z"/>
+</g>
+</svg>

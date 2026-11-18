@@ -9,15 +9,18 @@ description: 스킬을 검사할 때 사용한다. 외부 라이브러리 스킬
 
 ## 설정
 
-LLM 분석 제공자는 환경변수가 아니라 아래 값으로 관리한다. 실행할 때마다 이 값을 명령 앞에 붙인다.
+LLM 분석 제공자는 레포 루트 `.env`의 `SKILLSPECTOR_PROVIDER` 값으로 관리한다. SkillSpector는 `.env`를 직접 읽지 않으므로, 실행할 때마다 아래 명령으로 값을 읽어 명령 앞에 붙인다.
 
 ```bash
-SKILLSPECTOR_PROVIDER=
+grep -E '^SKILLSPECTOR_PROVIDER=' .env | tail -n 1 | cut -d= -f2- | tr -d "\"' \r"
 ```
 
-- 값이 비어 있으면 SkillSpector를 실행하지 않는다. 이 경우 검사를 통과하지 못한 것으로 보고, 사용자에게 이 파일의 값을 채워 달라고 알린다.
-- 셸에 설정된 `SKILLSPECTOR_PROVIDER` 환경변수는 쓰지 않는다. 항상 이 파일의 값을 쓴다.
-- 제공자의 API 키는 이 파일에 적지 않는다. 키는 각자의 환경변수로 둔다.
+- `.env`를 `source`하거나 셸로 실행하지 않는다. `SKILLSPECTOR_PROVIDER` 줄만 읽고, 다른 줄의 값은 읽거나 출력하지 않는다.
+- `.env` 파일이 없거나 `SKILLSPECTOR_PROVIDER` 줄이 없으면 값이 비어 있는 것으로 본다.
+- 쓸 수 있는 값: `openai`, `anthropic`, `anthropic_proxy`, `bedrock`, `minimax`, `nv_build`, `nv_inference`, `ollama`, `azure_openai`, `openai_compatible`, `gemini`, `claude_cli`, `gemini_cli`, `opencode_cli`. 목록은 `skillspector scan --help`의 `SKILLSPECTOR_PROVIDER` 설명으로 확인한다. `codex_cli`는 목록에 있어도 비활성화되어 있으므로 틀린 값으로 본다.
+- 값이 비어 있거나 위 목록에 없으면 `SKILLSPECTOR_PROVIDER=`를 붙이지 말고 `--no-llm`을 붙여 LLM 분석 없이 실행한다. 빈 값을 그대로 붙이면 SkillSpector가 기본 제공자(NVIDIA)로 파일을 보낸다.
+  - 결과는 아래 "결과 처리"대로 처리하되, 보고 맨 앞에 "LLM 분석 없이 정적 분석만 했다"는 것과 그 이유(값이 비어 있음 또는 틀린 값 `<값>`)를 알리고 `.env`의 값을 채워 달라고 요청한다.
+- 제공자의 API 키는 이 스킬이 `.env`에서 읽지 않는다. 키는 각자의 환경변수로 둔다.
 
 SkillSpector가 설치되어 있지 않으면 사용자에게 설치할지 묻는다. 설치 명령은 `uv tool install --python 3.12 git+https://github.com/NVIDIA/skillspector.git`이다(`uv` 필요). `--python 3.12`를 빼면 Python 3.14 환경에서 의존성 `yara-python` 빌드가 C 컴파일러 없이 실패한다.
 
@@ -50,6 +53,9 @@ LLM 분석은 검사 대상 파일 내용을 제공자 서버로 보낸다.
 git clone <Git URL> <레포 밖 임시 폴더>
 git -C <레포 밖 임시 폴더> rev-parse HEAD
 SKILLSPECTOR_PROVIDER=<설정 값> skillspector scan <레포 밖 임시 폴더> --fail-on-incomplete --format json --output <레포 밖 리포트 파일>
+
+# 라이브러리 스킬, 설정 값이 비어 있거나 틀린 경우
+skillspector scan <레포 밖 임시 폴더> --no-llm --fail-on-incomplete --format json --output <레포 밖 리포트 파일>
 
 # 팀 스킬 (외부 전송 금지)
 skillspector scan <스킬 폴더> --no-llm
