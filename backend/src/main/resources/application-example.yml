@@ -8,7 +8,7 @@ spring:
       - optional:file:.env[.properties]
       - optional:file:../.env[.properties]
   datasource:
-    url: jdbc:postgresql://localhost:${DB_PORT:5433}/${DB_NAME:trendizm}
+    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:trendizm}
     username: ${DB_USERNAME:trendizm}
     password: ${DB_PASSWORD}
   jpa:
