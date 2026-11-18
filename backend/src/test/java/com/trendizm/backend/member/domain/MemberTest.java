@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class MemberTest {
 
     @Test
-    @DisplayName("가입하면 USER 권한, 알림 수신, 활동 중 상태로 만들어진다")
+    @DisplayName("가입하면 USER 권한, 알림 수신, ACTIVE 상태, 활동 중으로 만들어진다")
     void 회원_생성() {
         Member member = Member.create("a@test.com", "encoded", "닉네임", true);
 
@@ -18,6 +18,7 @@ class MemberTest {
         assertThat(member.getRole()).isEqualTo(Role.USER);
         assertThat(member.isNotify()).isTrue();
         assertThat(member.isMarketingAgreed()).isTrue();
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
         assertThat(member.isWithdrawn()).isFalse();
     }
 
