@@ -8,19 +8,19 @@ import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.exception.MemberErrorCode;
 import com.trendizm.backend.member.application.port.MemberService;
 import com.trendizm.backend.member.application.port.out.MemberRepository;
+import com.trendizm.backend.member.domain.Member;
 import com.trendizm.backend.member.domain.Role;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Transactional
-@Sql("/test.sql")
 class MemberServiceTest {
 
     @Autowired
@@ -28,6 +28,15 @@ class MemberServiceTest {
 
     @Autowired
     private MemberRepository memberRepository;
+
+    /** 활동 중인 회원 1명, 탈퇴한 회원 1명. @Transactional이라 테스트가 끝나면 롤백된다 */
+    @BeforeEach
+    void setUp() {
+        memberRepository.save(Member.create("member@test.com", "encoded-password", "테스트회원", false));
+        Member withdrawn = Member.create("withdrawn@test.com", "encoded-password", "탈퇴회원", false);
+        withdrawn.withdraw();
+        memberRepository.save(withdrawn);
+    }
 
     private Long idOf(String email) {
         return memberRepository.findByEmail(email).orElseThrow().getId();

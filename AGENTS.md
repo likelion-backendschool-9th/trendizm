@@ -88,19 +88,19 @@ com.trendizm.backend.feed
 - 설정 파일: `backend/src/test/resources/application.properties` (테스트 전용이고 비밀번호 같은 민감정보 없음)
 - 테스트 이름 규칙: 메서드명은 한글 허용, `@DisplayName` 사용
 - 저장소 테스트는 `@SpringBootTest` + `@Transactional`로 테스트. 테스트가 끝나면 롤백.
-- 테스트 데이터는 테스트 클래스에서 `@Sql("/test.sql")`로 불러온다.
+- 테스트 데이터는 각 테스트 클래스의 `@BeforeEach`에서 엔티티를 직접 저장해 만든다. 공용 SQL 파일(`test.sql`)은 쓰지 않는다.
 
 ## 초기 데이터
 
 | 파일 | 용도 |
 | --- | --- |
-| `backend/src/main/resources/data.sql` | 기능을 구현하고 로컬에서 실행할 때 필요한 초기 데이터 |
-| `backend/src/test/resources/test.sql` | 구현을 마친 기능이 정상 동작하는지 테스트할 때 쓰는 데이터 |
+| `backend/src/main/resources/data.example.sql` | 로컬에서 화면을 확인할 때 쓰는 초기 데이터 예시. 커밋한다 |
+| `backend/src/main/resources/data.sql` | 위 파일을 복사해 각자 쓰는 파일. 커밋하지 않는다(`.gitignore`) |
 
-- 테스트는 `data.sql`의 데이터에 기대지 않는다. 테스트에 필요한 데이터는 `test.sql`에 넣는다.
+- 테스트는 `data.sql`의 데이터에 기대지 않는다. 테스트에 필요한 데이터는 그 테스트 클래스 안에서 만든다.
 - 테스트에서는 `data.sql`이 실행되지 않게 한다. H2는 내장 DB라서 기본 설정이면 `src/main/resources/data.sql`도 실행되므로, 테스트 설정에 `spring.sql.init.mode=never`를 둔다.
-- 나눈 이유:
-  - `data.sql`은 여러 사람이 같이 고치는 파일이라, 테스트가 여기에 기대면 누군가 데이터를 추가하거나 바꿀 때 관계없는 테스트가 깨진다.
+- 공용 `test.sql`을 쓰지 않는 이유:
+  - 여러 사람이 한 파일을 같이 고치면 develop에 합칠 때 충돌이 잦고, 쓰지 않는 더미 데이터가 계속 쌓인다.
   - 테스트에 필요한 데이터를 직접 만들면, 테스트 코드만 봐도 어떤 데이터로 무엇을 검사하는지 바로 보인다.
   - 테스트가 서로 영향을 주지 않아서, 순서나 다른 사람의 작업과 상관없이 항상 같은 결과가 나온다.
 

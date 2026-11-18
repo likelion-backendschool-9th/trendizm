@@ -5,16 +5,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.trendizm.backend.member.application.port.out.MemberRepository;
 import com.trendizm.backend.member.domain.Member;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Transactional
-@Sql("/test.sql")
 class MemberRepositoryTest {
 
     @Autowired
@@ -22,6 +21,15 @@ class MemberRepositoryTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    /** 활동 중인 회원 1명, 탈퇴한 회원 1명. @Transactional이라 테스트가 끝나면 롤백된다 */
+    @BeforeEach
+    void setUp() {
+        memberRepository.save(Member.create("member@test.com", "encoded-password", "테스트회원", false));
+        Member withdrawn = Member.create("withdrawn@test.com", "encoded-password", "탈퇴회원", false);
+        withdrawn.withdraw();
+        memberRepository.save(withdrawn);
+    }
 
     @Test
     @DisplayName("저장하면 id와 생성·수정 시각이 채워진다")
