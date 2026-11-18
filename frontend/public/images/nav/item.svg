@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 22 22">
+  <defs>
+    <style>
+      .line {
+        fill: none;
+        stroke: #777;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.6px;
+      }
+    </style>
+  </defs>
+  <g>
+    <path class="line" d="M4.6,7.3h12.8l.9,11H3.7l.9-11Z"/>
+    <path class="line" d="M8.2,7.3v-1.8c0-.7.3-1.4.8-1.9.5-.5,1.2-.8,1.9-.8s1.4.3,1.9.8c.5.5.8,1.2.8,1.9v1.8"/>
+  </g>
+</svg>

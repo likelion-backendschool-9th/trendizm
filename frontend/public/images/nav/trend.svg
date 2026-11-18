@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 22 22">
+  <!-- Generator: Adobe Illustrator 30.8.2, SVG Export Plug-In . SVG Version: 2.1.4 Build 7)  -->
+  <defs>
+    <style>
+      .line {
+        fill: none;
+        stroke: #777;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.6px;
+      }
+    </style>
+  </defs>
+  <g>
+    <g>
+      <g>
+        <path class="line" d="M3.7,15.6l4.6-4.6,3.7,2.8,6.4-7.3"/>
+        <path class="line" d="M14.7,6.4h3.7v3.7"/>
+      </g>
+    </g>
+  </g>
+</svg>

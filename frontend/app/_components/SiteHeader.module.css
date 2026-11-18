@@ -1,0 +1,16 @@
+/* 화면 폭에 따라 보이고 숨기는 규칙만 둔다. 나머지 스타일은 SiteHeader.tsx의 style에 있다. */
+/* 768px 이상은 데스크톱 헤더, 그보다 좁으면 모바일 상단 헤더와 하단 고정 내비만 보인다. */
+
+.mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .desktop {
+    display: none;
+  }
+
+  .mobile {
+    display: block;
+  }
+}
