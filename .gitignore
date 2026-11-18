@@ -26,9 +26,15 @@
 .env.*
 !.env.example
 
+# YAML configuration (비밀값이 들어갈 수 있어 기본은 제외하고, 아래 예외만 커밋한다)
+*.yml
+*.yaml
+
 # Deployment configuration is source-controlled; secrets and certificates are not.
 !.github/workflows/*.yml
+!/compose.yaml
 !/compose.prod.yaml
+!/compose.override.example.yaml
 !/backend/src/main/resources/application.yaml
 certs/
 
