@@ -1,0 +1,21 @@
+/* 화면 폭에 따라 보이고 숨기는 규칙만 둔다. 나머지 스타일은 SiteFooter.tsx의 style에 있다. */
+/* 768px 이상은 4단 푸터, 그보다 좁으면 세로로 쌓은 푸터를 보인다. */
+
+.mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .desktop {
+    display: none;
+  }
+
+  .mobile {
+    display: block;
+  }
+
+  /* 화면 아래에 떠 있는 하단 내비가 푸터를 가리지 않도록 내비 높이만큼 비운다. */
+  .bottomNavSpace {
+    height: 64px;
+  }
+}
