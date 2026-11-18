@@ -8,9 +8,7 @@ public enum PointErrorCode implements ErrorCode {
 
     INSUFFICIENT_POINT_BALANCE(HttpStatus.CONFLICT, "포인트가 부족합니다."),
     /** 같은 열람 id로 이미 결제한 경우 */
-    POINT_ALREADY_PAID(HttpStatus.CONFLICT, "이미 결제한 열람입니다."),
-    /** 처음 쓰는 회원의 지갑을 동시에 만들려다 DB에서 막힌 경우. 다시 시도하면 된다 */
-    POINT_WALLET_CONFLICT(HttpStatus.CONFLICT, "요청이 겹쳤습니다. 잠시 후 다시 시도해 주세요.");
+    POINT_ALREADY_PAID(HttpStatus.CONFLICT, "이미 결제한 열람입니다.");
 
     private final HttpStatus status;
     private final String message;

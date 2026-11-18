@@ -15,7 +15,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 /**
- * point_wallets 테이블. 회원 1명당 지갑 1개이고, 처음 포인트가 오갈 때 만든다.
+ * point_wallets 테이블. 회원 1명당 지갑 1개이고, 처음 포인트를 받을 때 만든다.
+ * 서비스에서는 동시 생성 충돌을 피하려고 PointWalletRepository.insertIfAbsent로 만든다 (create는 테스트·직접 생성용).
  * 잔액을 바꿀 때는 서비스에서 지갑 행을 잠그고(SELECT ... FOR UPDATE) 바꾼다.
  * TODO(point): #18(BaseTimeEntity)이 develop에 머지되면 created_at·updated_at을 BaseTimeEntity 상속으로 바꾼다.
  */

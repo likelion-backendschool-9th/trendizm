@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -110,16 +109,14 @@ public class PointServiceImpl implements PointService {
         historyRepository.save(PointHistory.create(wallet, PointType.REWARD, amount, ratingId));
     }
 
-    /** 지갑을 잠그고 가져오고, 없으면 잔액 0인 지갑을 만든다 */
+    /**
+     * 지갑이 없으면 먼저 만들고(INSERT ... ON CONFLICT DO NOTHING), 잠가서 가져온다.
+     * 같은 회원의 첫 지갑을 동시에 만들어도, 늦은 쪽은 아무것도 하지 않고 만들어진 지갑을 잠근다.
+     */
     private PointWallet lockOrCreateWallet(Long userId) {
-        return walletRepository.findByUserIdForUpdate(userId).orElseGet(() -> {
-            try {
-                return walletRepository.saveAndFlush(PointWallet.create(userId));
-            } catch (DataIntegrityViolationException e) {
-                // 같은 회원의 첫 지갑을 동시에 만든 경우. 이 트랜잭션은 롤백되고, 다시 시도하면 만들어진 지갑을 쓴다
-                throw new BusinessException(PointErrorCode.POINT_WALLET_CONFLICT);
-            }
-        });
+        walletRepository.insertIfAbsent(userId);
+        return walletRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new IllegalStateException("지갑을 만들지 못했습니다. userId=" + userId));
     }
 
     private static void validate(UnlockPaymentCommand command) {

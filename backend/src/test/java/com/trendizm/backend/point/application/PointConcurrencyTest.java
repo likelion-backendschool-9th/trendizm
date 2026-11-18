@@ -80,6 +80,48 @@ class PointConcurrencyTest {
         assertThat(pointService.getBalance(userB).balance()).isEqualTo(100);
     }
 
+    @Test
+    @DisplayName("지갑이 없는 등록자의 아이템을 두 명이 동시에 열람해도 둘 다 성공하고 지갑은 하나만 생긴다")
+    void 첫_지갑_동시_생성() throws Exception {
+        Long payerA = 1L;
+        Long payerB = 2L;
+        Long newEarner = 3L;
+        pointService.rewardForReview(payerA, 1L, 100);
+        pointService.rewardForReview(payerB, 2L, 100);
+
+        List<Throwable> failures = runConcurrently(List.of(
+                () -> {
+                    pointService.payForUnlock(new UnlockPaymentCommand(payerA, newEarner, 100L, 100, 100));
+                    return true;
+                },
+                () -> {
+                    pointService.payForUnlock(new UnlockPaymentCommand(payerB, newEarner, 101L, 100, 100));
+                    return true;
+                }));
+
+        assertThat(failures).isEmpty();
+        assertThat(pointService.getBalance(newEarner).balance()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("지갑이 없는 회원에게 서로 다른 후기 보상이 동시에 들어와도 모두 지급된다")
+    void 첫_보상_동시_지급() throws Exception {
+        Long newUser = 5L;
+        List<Callable<Boolean>> requests = new ArrayList<>();
+        for (long ratingId = 1; ratingId <= 4; ratingId++) {
+            long id = ratingId;
+            requests.add(() -> {
+                pointService.rewardForReview(newUser, id, 10);
+                return true;
+            });
+        }
+
+        List<Throwable> failures = runConcurrently(requests);
+
+        assertThat(failures).isEmpty();
+        assertThat(pointService.getBalance(newUser).balance()).isEqualTo(40);
+    }
+
     /** 모든 요청을 한 번에 출발시키고, 실패한 요청의 예외 목록을 돌려준다 */
     private static List<Throwable> runConcurrently(List<Callable<Boolean>> requests) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(requests.size());
