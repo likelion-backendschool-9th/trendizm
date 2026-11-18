@@ -1,13 +1,14 @@
 "use client";
 
 // 브라우저(클라이언트 컴포넌트)에서 백엔드 API를 부를 때 쓰는 함수.
-// - 주소는 백엔드 경로 그대로 쓴다. 예: apiFetch("/api/auth/login", { method: "POST", body: {...} })
-//   next.config.ts의 rewrites가 /api/** 를 백엔드로 전달한다.
+// - 주소는 백엔드 경로 그대로 쓴다. 예: apiFetch<LoginMember>("/api/auth/login", { method: "POST", body: {...} })
+//   Next 서버(app/api, BFF)가 받아서 쿠키의 토큰을 Authorization 헤더로 바꿔 백엔드에 전달한다.
 // - 로그인 토큰은 HttpOnly 쿠키라서 자바스크립트로 다루지 않는다. 브라우저가 알아서 붙인다.
 // - 401(로그인 만료)이면 /api/auth/reissue로 토큰을 한 번 새로 받고 원래 요청을 다시 보낸다.
 //   그래도 401이면 로그인 화면으로 보낸다(redirectOnUnauthorized: false로 끌 수 있다).
 // - 실패하면 ApiError를 던진다. code, message, errors(필드별 오류)가 들어 있다.
-//   서버에 닿지 못한 경우(네트워크 끊김 등)도 ApiError(status 0, code "NETWORK_ERROR")라서 instanceof ApiError 하나로 처리한다.
+//   서버에 닿지 못한 경우도 code "NETWORK_ERROR"인 ApiError라서 instanceof ApiError 하나로 처리한다.
+//   (Next 서버에 못 닿으면 status 0, Next 서버가 백엔드에 못 닿으면 status 502)
 
 import { ApiError, fetchOrNetworkError, readErrorResponse } from "./types";
 

@@ -95,3 +95,10 @@ export async function readErrorResponse(response: Response): Promise<ErrorRespon
     message: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   };
 }
+
+/** 로그인한 회원. 로그인·가입·재발급 API(/api/auth/login 등)가 돌려준다 */
+export type LoginMember = {
+  id: number;
+  nickname: string;
+  role: "USER" | "ADMIN";
+};
