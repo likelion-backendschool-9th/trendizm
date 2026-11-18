@@ -1,9 +1,11 @@
 package com.trendizm.backend.member.application.port;
 
+import com.trendizm.backend.member.application.dto.MemberCredentials;
 import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.dto.RegisterMemberCommand;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 회원 유스케이스 (in 포트). 다른 도메인은 회원 정보를 이 인터페이스로만 가져간다.
@@ -33,4 +35,10 @@ public interface MemberService {
 
     /** 가입에 쓸 수 있는 닉네임인지. 앞뒤 공백은 무시한다 */
     boolean isNicknameAvailable(String nickname);
+
+    /**
+     * 로그인 확인용. auth(로그인)에서만 호출한다. 대소문자·앞뒤 공백은 무시하고 찾는다.
+     * 탈퇴 회원도 반환하므로(withdrawn = true) 호출하는 쪽에서 거른다.
+     */
+    Optional<MemberCredentials> findCredentials(String email);
 }

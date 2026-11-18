@@ -63,6 +63,7 @@ com.trendizm.backend.feed
 - 도메인끼리 서로 호출하는 순환 구조(A → B, B → A)는 만들지 않는다.
 - 로그인 없이 허용할 경로는 `auth/adapter/out/security/SecurityConfig`의 `permitAll` 목록에 추가한다. 새 컨트롤러를 만들면 공개 여부를 정해 `SecurityConfigTest`의 `ACCESS`에도 추가한다.
 - 컨트롤러에서 로그인 사용자가 필요하면 `@AuthenticationPrincipal(expression = "id") Long userId`로 id만 받는다. `CustomUserDetails`는 auth의 Spring Security 어댑터 구현이므로 다른 도메인에서 참조하지 않는다.
+- 인증은 BFF 방식이다. 브라우저는 Next 서버(`frontend/app/api`)만 부르고, Next 서버가 쿠키의 토큰을 `Authorization: Bearer` 헤더로 바꿔 백엔드에 보낸다. 백엔드는 쿠키를 읽거나 내려 주지 않고, 로그인·가입·재발급 응답 본문으로 토큰을 준다.
 - `TODO(<도메인>)` 주석에 구현 순서가 적혀 있으면 그 순서를 따른다.
 - 위 규칙 중 변경 감지로 저장, `findByXxx` 메서드 이름, `TODO` 순서를 뺀 나머지는 테스트로 검사한다. 규칙을 어기면 `./gradlew test`가 실패한다.
   - 구조·의존 규칙: `src/test/.../ArchitectureTest` (ArchUnit)

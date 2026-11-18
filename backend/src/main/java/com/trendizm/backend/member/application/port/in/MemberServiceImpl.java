@@ -1,6 +1,7 @@
 package com.trendizm.backend.member.application.port.in;
 
 import com.trendizm.backend.global.error.BusinessException;
+import com.trendizm.backend.member.application.dto.MemberCredentials;
 import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.dto.RegisterMemberCommand;
 import com.trendizm.backend.member.application.exception.MemberErrorCode;
@@ -9,6 +10,7 @@ import com.trendizm.backend.member.application.port.out.MemberRepository;
 import com.trendizm.backend.member.domain.Member;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -67,5 +69,10 @@ public class MemberServiceImpl implements MemberService {
     @Override
     public boolean isNicknameAvailable(String nickname) {
         return !memberRepository.existsByNickname(nickname.strip());
+    }
+
+    @Override
+    public Optional<MemberCredentials> findCredentials(String email) {
+        return memberRepository.findByEmail(Member.normalizeEmail(email)).map(MemberCredentials::from);
     }
 }
