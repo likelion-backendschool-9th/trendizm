@@ -1,5 +1,6 @@
 package com.trendizm.backend.point.domain;
 
+import com.trendizm.backend.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -7,24 +8,21 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 /**
  * point_wallets 테이블. 회원 1명당 지갑 1개이고, 처음 포인트를 받을 때 만든다.
  * 서비스에서는 동시 생성 충돌을 피하려고 PointWalletRepository.insertIfAbsent로 만든다 (create는 테스트·직접 생성용).
  * 잔액을 바꿀 때는 서비스에서 지갑 행을 잠그고(SELECT ... FOR UPDATE) 바꾼다.
- * TODO(point): #18(BaseTimeEntity)이 develop에 머지되면 created_at·updated_at을 BaseTimeEntity 상속으로 바꾼다.
+ * created_at·updated_at은 BaseTimeEntity가 채운다. insertIfAbsent(네이티브 INSERT)로 만들 때는 SQL에서 직접 채운다.
  */
 @Entity
 @Table(name = "point_wallets")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PointWallet {
+public class PointWallet extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,14 +39,6 @@ public class PointWallet {
     @Version
     @Column(nullable = false)
     private long version;
-
-    @CreationTimestamp
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
 
     private PointWallet(Long userId) {
         this.userId = userId;

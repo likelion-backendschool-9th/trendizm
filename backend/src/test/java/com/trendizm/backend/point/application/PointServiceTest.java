@@ -44,6 +44,7 @@ class PointServiceTest {
             assertThat(history.type()).isEqualTo("REWARD");
             assertThat(history.amount()).isEqualTo(50);
             assertThat(history.balanceAfter()).isEqualTo(50);
+            assertThat(history.createdAt()).as("BaseCreatedEntity(JPA Auditing)가 채운다").isNotNull();
         });
     }
 
