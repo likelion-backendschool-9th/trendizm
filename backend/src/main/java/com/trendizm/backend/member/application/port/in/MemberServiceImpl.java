@@ -7,7 +7,7 @@ import com.trendizm.backend.member.application.dto.RegisterMemberCommand;
 import com.trendizm.backend.member.application.exception.MemberErrorCode;
 import com.trendizm.backend.member.application.port.MemberService;
 import com.trendizm.backend.member.application.port.out.MemberRepository;
-import com.trendizm.backend.member.domain.Member;
+import com.trendizm.backend.member.domain.entity.Member;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;

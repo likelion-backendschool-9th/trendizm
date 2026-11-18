@@ -175,15 +175,22 @@ class ArchitectureTest {
         };
     }
 
+    /** 패키지가 basePackage이거나 그 하위 패키지면 true (예: member.domain, member.domain.entity) */
+    private static boolean isInPackage(JavaClass javaClass, String basePackage) {
+        String packageName = javaClass.getPackageName();
+        return packageName.equals(basePackage) || packageName.startsWith(basePackage + ".");
+    }
+
     private static ArchCondition<JavaClass> haveFromEntityFactory() {
         return new ArchCondition<>("public static from(같은 도메인 엔티티)를 가진다") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
                 String domainPackage = ROOT + "." + domainOf(javaClass) + ".domain";
                 // 엔티티가 없는 도메인(예: auth)의 응답은 from(entity)로 만들 수 없으니 검사하지 않는다.
-                // domain 패키지의 enum 같은 클래스는 엔티티로 세지 않도록 @Entity로 판단한다.
+                // 엔티티는 domain/entity에 있으므로 domain과 그 하위 패키지를 모두 본다.
+                // domain/enums의 enum 같은 클래스는 엔티티로 세지 않도록 @Entity로 판단한다.
                 boolean domainHasEntity = classes.stream()
-                        .anyMatch(c -> c.getPackageName().equals(domainPackage) && c.isAnnotatedWith(Entity.class));
+                        .anyMatch(c -> isInPackage(c, domainPackage) && c.isAnnotatedWith(Entity.class));
                 if (!domainHasEntity) {
                     return;
                 }
@@ -192,7 +199,8 @@ class ArchitectureTest {
                         .filter(method -> method.getModifiers().containsAll(Set.of(JavaModifier.PUBLIC, JavaModifier.STATIC)))
                         .filter(method -> method.getRawReturnType().equals(javaClass))
                         .anyMatch(method -> method.getRawParameterTypes().size() == 1
-                                && method.getRawParameterTypes().get(0).getPackageName().equals(domainPackage));
+                                && isInPackage(method.getRawParameterTypes().get(0), domainPackage)
+                                && method.getRawParameterTypes().get(0).isAnnotatedWith(Entity.class));
                 events.add(new SimpleConditionEvent(javaClass, hasFrom,
                         javaClass.getName() + "에 public static from(" + domainPackage + "의 엔티티)가 없다"));
             }

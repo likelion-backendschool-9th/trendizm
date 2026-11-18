@@ -1,7 +1,9 @@
-package com.trendizm.backend.member.domain;
+package com.trendizm.backend.member.domain.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.trendizm.backend.member.domain.enums.MemberStatus;
+import com.trendizm.backend.member.domain.enums.Role;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package com.trendizm.backend.ranking.domain;
+package com.trendizm.backend.notification.domain.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -10,20 +10,20 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * rankings 테이블. 컬럼은 아직 정해지지 않아 id만 있다.
+ * notifications 테이블. 컬럼은 아직 정해지지 않아 id만 있다.
  * 컬럼이 정해지면 필드를 추가하고 create()에 파라미터를 더한다.
  */
 @Entity
-@Table(name = "rankings")
+@Table(name = "notifications")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Ranking {
+public class Notification {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    public static Ranking create() {
-        return new Ranking();
+    public static Notification create() {
+        return new Notification();
     }
 }

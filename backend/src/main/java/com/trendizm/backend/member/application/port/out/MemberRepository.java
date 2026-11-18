@@ -1,6 +1,6 @@
 package com.trendizm.backend.member.application.port.out;
 
-import com.trendizm.backend.member.domain.Member;
+import com.trendizm.backend.member.domain.entity.Member;
 import java.util.List;
 import java.util.Optional;
 

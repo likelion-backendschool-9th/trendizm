@@ -3,7 +3,7 @@ package com.trendizm.backend.member.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.trendizm.backend.member.application.port.out.MemberRepository;
-import com.trendizm.backend.member.domain.Member;
+import com.trendizm.backend.member.domain.entity.Member;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

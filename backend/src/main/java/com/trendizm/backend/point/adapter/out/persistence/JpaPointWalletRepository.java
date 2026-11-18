@@ -1,7 +1,7 @@
 package com.trendizm.backend.point.adapter.out.persistence;
 
 import com.trendizm.backend.point.application.port.out.PointWalletRepository;
-import com.trendizm.backend.point.domain.PointWallet;
+import com.trendizm.backend.point.domain.entity.PointWallet;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

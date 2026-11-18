@@ -1,6 +1,6 @@
 package com.trendizm.backend.rating.application.port.out;
 
-import com.trendizm.backend.rating.domain.Rating;
+import com.trendizm.backend.rating.domain.entity.Rating;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

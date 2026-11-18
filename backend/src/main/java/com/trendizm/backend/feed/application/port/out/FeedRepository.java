@@ -1,6 +1,6 @@
 package com.trendizm.backend.feed.application.port.out;
 
-import com.trendizm.backend.feed.domain.Feed;
+import com.trendizm.backend.feed.domain.entity.Feed;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

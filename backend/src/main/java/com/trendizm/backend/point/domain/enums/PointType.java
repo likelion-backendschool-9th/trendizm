@@ -1,4 +1,4 @@
-package com.trendizm.backend.point.domain;
+package com.trendizm.backend.point.domain.enums;
 
 /** 포인트 변동 종류. point_histories.type에 이름 그대로 저장한다 */
 public enum PointType {

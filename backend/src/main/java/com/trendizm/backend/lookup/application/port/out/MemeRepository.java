@@ -1,6 +1,6 @@
 package com.trendizm.backend.lookup.application.port.out;
 
-import com.trendizm.backend.lookup.domain.Meme;
+import com.trendizm.backend.lookup.domain.entity.Meme;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
