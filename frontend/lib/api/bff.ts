@@ -70,12 +70,12 @@ export function clearAuthCookies(response: NextResponse) {
 
 /**
  * 로그인·가입·재발급을 백엔드에 보내고, 성공하면 토큰을 쿠키로 저장한 뒤 회원 정보만 돌려준다.
- * 실패하면 백엔드의 상태 코드와 { code, message } 본문을 그대로 돌려준다.
+ * 실패하면 백엔드의 상태 코드와 { code, message } 본문을 그대로 돌려준다. clearCookiesOnStatus에 있는 상태 코드면 두 쿠키를 지운다.
  */
 export async function forwardLogin(
   backendPath: string,
   body: string,
-  options: { clearCookiesOnFailure?: boolean } = {},
+  options: { clearCookiesOnStatus?: number[] } = {},
 ): Promise<NextResponse> {
   let backendResponse: Response;
   try {
@@ -94,7 +94,7 @@ export async function forwardLogin(
       status: backendResponse.status,
       headers: { "Content-Type": backendResponse.headers.get("Content-Type") ?? "application/json" },
     });
-    if (options.clearCookiesOnFailure && backendResponse.status === 401) {
+    if (options.clearCookiesOnStatus?.includes(backendResponse.status)) {
       clearAuthCookies(response);
     }
     return response;
