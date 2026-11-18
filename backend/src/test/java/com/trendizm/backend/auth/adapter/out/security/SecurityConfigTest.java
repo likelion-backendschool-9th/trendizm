@@ -8,6 +8,7 @@ import com.trendizm.backend.feed.application.port.FeedService;
 import com.trendizm.backend.item.application.port.ItemService;
 import com.trendizm.backend.lookup.application.port.MemeService;
 import com.trendizm.backend.notification.application.port.NotificationService;
+import com.trendizm.backend.point.application.port.PointService;
 import com.trendizm.backend.ranking.application.port.RankingService;
 import com.trendizm.backend.rating.application.port.RatingService;
 import java.util.Map;
@@ -40,7 +41,8 @@ class SecurityConfigTest {
             "/api/lookup/memes", true,
             "/api/rankings", true,
             "/api/ratings", true,
-            "/api/notifications", false);
+            "/api/notifications", false,
+            "/api/points", false);
 
     @Autowired
     private MockMvc mockMvc;
@@ -53,6 +55,7 @@ class SecurityConfigTest {
     @MockitoBean private ItemService itemService;
     @MockitoBean private MemeService memeService;
     @MockitoBean private NotificationService notificationService;
+    @MockitoBean private PointService pointService;
     @MockitoBean private RankingService rankingService;
     @MockitoBean private RatingService ratingService;
 
