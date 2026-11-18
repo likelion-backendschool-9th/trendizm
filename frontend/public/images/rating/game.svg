@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 25 21" style="enable-background:new 0 0 25 21;" xml:space="preserve">
+<style type="text/css">
+	.inner{fill:none;stroke:#34343B;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+	.outer{fill:#34343B;}
+</style>
+<g id="game">
+	<path class="inner" d="M8.2,1h8.1c3,0,4.6,2.1,5.3,5.1l1.8,9.3c0.6,3.4-2.5,5.5-5.1,3.4l-4.1-3.4h-4.1l-4.1,3.4 c-2.5,2.1-5.7,0-5.1-3.4l1.8-9.3C3.6,3.1,5.1,1,8.2,1z"/>
+	<path class="inner" d="M5.1,8.6h3 M8.2,8.6h3 M8.2,8.6V6.1 M8.2,8.6v2.5"/>
+	<path class="outer" d="M16.3,8.2c0.8,0,1.5-0.6,1.5-1.3s-0.7-1.3-1.5-1.3c-0.8,0-1.5,0.6-1.5,1.3S15.4,8.2,16.3,8.2z" />
+	<path class="outer" d="M19.3,11.6c0.8,0,1.5-0.6,1.5-1.3c0-0.7-0.7-1.3-1.5-1.3s-1.5,0.6-1.5,1.3 C17.8,11,18.5,11.6,19.3,11.6z"/>
+</g>
+</svg>

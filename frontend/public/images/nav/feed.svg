@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 22 22">
+  <defs>
+    <style>
+      .line {
+        fill: none;
+        stroke: #777;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.6px;
+      }
+    </style>
+  </defs>
+  <g>
+    <g>
+      <g>
+        <path class="line" d="M4.6,3.7h12.8c1,0,1.8.8,1.8,1.8v11c0,1-.8,1.8-1.8,1.8H4.6c-1,0-1.8-.8-1.8-1.8V5.5c0-1,.8-1.8,1.8-1.8Z"/>
+        <path class="line" d="M6.4,8.2h9.2M6.4,11.9h9.2M6.4,15.6h5.5"/>
+      </g>
+    </g>
+  </g>
+</svg>
