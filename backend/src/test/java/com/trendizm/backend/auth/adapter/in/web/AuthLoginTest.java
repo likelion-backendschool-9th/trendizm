@@ -11,7 +11,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.trendizm.backend.auth.adapter.out.security.CustomUserDetails;
 import com.trendizm.backend.auth.application.port.out.TokenProvider;
 import com.trendizm.backend.member.application.port.out.MemberRepository;
-import com.trendizm.backend.member.domain.Member;
+import com.trendizm.backend.member.domain.entity.Member;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

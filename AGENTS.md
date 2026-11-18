@@ -37,7 +37,9 @@ Spring Boot 4와 Next.js 16은 이전 버전과 API가 다르다. 이전 버전 
 
 ```
 com.trendizm.backend.feed
-├── domain/Feed.java                            엔티티
+├── domain
+│   ├── entity/Feed.java                        엔티티
+│   └── enums/FeedStatus.java                   enum (상태·종류 등 정해진 값)
 ├── application
 │   ├── port/FeedService.java                   유스케이스 인터페이스 (in 포트)
 │   ├── port/in/FeedServiceImpl.java            유스케이스 구현
@@ -53,8 +55,12 @@ com.trendizm.backend.feed
 - 이 구조는 "최소 변경" 같은 다른 규칙보다 우선한다. 비어 있거나 구현체가 하나뿐인 포트 인터페이스도 불필요한 추상화로 보고 생략하지 않는다.
 - 컨트롤러는 `XxxService` 인터페이스에만, 서비스는 `port/out/XxxRepository`에만 의존한다. `XxxServiceImpl`과 `JpaXxxRepository`를 직접 참조하지 않는다.
 - `JpaXxxRepository`는 `JpaRepository`와 out 포트를 함께 상속하는 인터페이스다. 새 조회는 out 포트에 Spring Data 메서드 이름(`findByXxx`)으로 추가한다.
-- 요청 DTO는 `adapter/in/web/dto`, 응답 DTO는 `application/dto`에 record로 둔다. 응답은 `XxxResponse.from(entity)`로 만든다. 같은 도메인 `domain` 패키지에 `@Entity`가 없으면(예: `auth`) 이 규칙은 적용하지 않는다.
+- 요청 DTO는 `adapter/in/web/dto`, 응답 DTO는 `application/dto`에 record로 둔다. 응답은 `XxxResponse.from(entity)`로 만든다. 같은 도메인 `domain`(하위 `domain/entity` 포함)에 `@Entity`가 없으면(예: `auth`) 이 규칙은 적용하지 않는다.
 - 엔티티는 `protected` 기본 생성자와 정적 팩토리 `create(...)`로 만들고, 수정은 엔티티 메서드를 호출해 변경 감지로 저장한다.
+- 엔티티는 `domain/entity`, enum은 `domain/enums`에 둔다.
+- 값이 정해진 칼럼(상태·종류 등)은 DB enum 타입을 쓰지 않는다. ERD와 DB는 `varchar(30)`, 엔티티는 `@Enumerated(EnumType.STRING)`과 `@Column(length = 30)`으로 둔다. 허용 값은 Java enum이 기준이고, ERD 칼럼 note에는 enum 위치만 적는다.
+  - 이유: PostgreSQL enum 타입 칼럼에는 `@Enumerated(STRING)`이 보내는 문자열이 들어가지 않아 저장할 때 오류가 난다(42804). 로컬(`ddl-auto: update`)과 테스트(H2)에서는 드러나지 않는다.
+  - 화면에 한글 이름이 필요하면 enum에 `label` 필드로 둔다. 예: `CHARGE("충전")`
 - 서비스 클래스에는 `@Transactional(readOnly = true)`를 붙이고, 쓰기 메서드에만 `@Transactional`을 붙인다.
 - 다른 도메인은 in 포트(`application/port/XxxService` 인터페이스)로만 호출한다.
 - 다른 도메인의 엔티티(`domain`), 리포지토리(`port/out`, `JpaXxxRepository`), `XxxServiceImpl`은 직접 참조하지 않는다.

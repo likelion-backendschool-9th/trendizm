@@ -8,7 +8,7 @@ import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.exception.MemberErrorCode;
 import com.trendizm.backend.member.application.port.MemberService;
 import com.trendizm.backend.member.application.port.out.MemberRepository;
-import com.trendizm.backend.member.domain.Member;
+import com.trendizm.backend.member.domain.entity.Member;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;

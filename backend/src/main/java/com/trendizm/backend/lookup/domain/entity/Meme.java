@@ -1,4 +1,4 @@
-package com.trendizm.backend.notification.domain;
+package com.trendizm.backend.lookup.domain.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -10,20 +10,20 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * notifications 테이블. 컬럼은 아직 정해지지 않아 id만 있다.
+ * memes 테이블. 컬럼은 아직 정해지지 않아 id만 있다.
  * 컬럼이 정해지면 필드를 추가하고 create()에 파라미터를 더한다.
  */
 @Entity
-@Table(name = "notifications")
+@Table(name = "memes")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Notification {
+public class Meme {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    public static Notification create() {
-        return new Notification();
+    public static Meme create() {
+        return new Meme();
     }
 }

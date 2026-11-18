@@ -1,6 +1,6 @@
 package com.trendizm.backend.point.application.dto;
 
-import com.trendizm.backend.point.domain.PointWallet;
+import com.trendizm.backend.point.domain.entity.PointWallet;
 
 /** 보유 포인트. 예: { "balance": 1200 } */
 public record PointBalanceResponse(int balance) {

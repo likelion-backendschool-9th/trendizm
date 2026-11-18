@@ -1,6 +1,7 @@
-package com.trendizm.backend.point.domain;
+package com.trendizm.backend.point.domain.entity;
 
 import com.trendizm.backend.global.entity.BaseCreatedEntity;
+import com.trendizm.backend.point.domain.enums.PointType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

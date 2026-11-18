@@ -1,6 +1,6 @@
 package com.trendizm.backend.member.application.dto;
 
-import com.trendizm.backend.member.domain.Member;
+import com.trendizm.backend.member.domain.entity.Member;
 
 /**
  * 로그인 확인용 회원 정보. 암호화된 비밀번호가 들어 있으므로 auth(로그인)에서만 쓴다.

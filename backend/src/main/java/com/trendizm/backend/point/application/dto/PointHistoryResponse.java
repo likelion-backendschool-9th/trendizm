@@ -1,6 +1,6 @@
 package com.trendizm.backend.point.application.dto;
 
-import com.trendizm.backend.point.domain.PointHistory;
+import com.trendizm.backend.point.domain.entity.PointHistory;
 import java.time.LocalDateTime;
 
 /**

@@ -1,7 +1,7 @@
 package com.trendizm.backend.point.application.port.out;
 
-import com.trendizm.backend.point.domain.PointHistory;
-import com.trendizm.backend.point.domain.PointType;
+import com.trendizm.backend.point.domain.entity.PointHistory;
+import com.trendizm.backend.point.domain.enums.PointType;
 import java.util.Collection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

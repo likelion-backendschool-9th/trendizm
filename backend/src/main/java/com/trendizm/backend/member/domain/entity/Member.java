@@ -1,6 +1,8 @@
-package com.trendizm.backend.member.domain;
+package com.trendizm.backend.member.domain.entity;
 
 import com.trendizm.backend.global.entity.BaseTimeEntity;
+import com.trendizm.backend.member.domain.enums.MemberStatus;
+import com.trendizm.backend.member.domain.enums.Role;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -41,7 +43,7 @@ public class Member extends BaseTimeEntity {
     private String nickname;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private Role role;
 
     /** 서비스 알림 수신 여부 */
@@ -54,7 +56,7 @@ public class Member extends BaseTimeEntity {
 
     /** 관리자 이용 제한 상태. 탈퇴는 deletedAt으로 따로 관리한다 */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private MemberStatus status;
 
     private LocalDateTime deletedAt;

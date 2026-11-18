@@ -1,6 +1,6 @@
 package com.trendizm.backend.point.application.port.out;
 
-import com.trendizm.backend.point.domain.PointWallet;
+import com.trendizm.backend.point.domain.entity.PointWallet;
 import java.util.Optional;
 
 /** 구현체는 adapter/out/persistence/JpaPointWalletRepository (Spring Data가 자동 구현). */

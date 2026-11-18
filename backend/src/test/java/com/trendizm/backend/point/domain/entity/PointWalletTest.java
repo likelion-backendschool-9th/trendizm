@@ -1,4 +1,4 @@
-package com.trendizm.backend.point.domain;
+package com.trendizm.backend.point.domain.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

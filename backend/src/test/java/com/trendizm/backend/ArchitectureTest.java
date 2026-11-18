@@ -11,13 +11,20 @@ import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaEnumConstant;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Transient;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -162,6 +169,24 @@ class ArchitectureTest {
                 .check(classes);
     }
 
+    @Test
+    @DisplayName("엔티티는 <도메인>.domain.entity 패키지에 둔다")
+    void 엔티티_위치_규칙() {
+        classes().that().areAnnotatedWith(Entity.class)
+                .should().resideInAPackage(ROOT + ".*.domain.entity")
+                .check(classes);
+    }
+
+    @Test
+    @DisplayName("엔티티의 enum 필드는 @Enumerated(EnumType.STRING)으로 저장한다 (빠뜨리면 기본값 ORDINAL)")
+    void enum_칼럼은_STRING으로_저장한다() {
+        classes().that().areAnnotatedWith(Entity.class)
+                .or().areAnnotatedWith(MappedSuperclass.class)
+                .or().areAnnotatedWith(Embeddable.class)
+                .should(storeEnumFieldsAsString())
+                .check(classes);
+    }
+
     private static ArchCondition<JavaClass> extendOutPortOfSameDomain() {
         return new ArchCondition<>("같은 도메인의 application.port.out 인터페이스를 상속한다") {
             @Override
@@ -175,15 +200,45 @@ class ArchitectureTest {
         };
     }
 
+    private static ArchCondition<JavaClass> storeEnumFieldsAsString() {
+        return new ArchCondition<>("enum 필드에 @Enumerated(EnumType.STRING)을 붙인다") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                for (JavaField field : javaClass.getFields()) {
+                    if (!field.getRawType().isEnum()
+                            || field.getModifiers().contains(JavaModifier.STATIC)
+                            || field.isAnnotatedWith(Transient.class)) {
+                        continue;
+                    }
+                    // @Enumerated를 빠뜨려도 JPA 기본값은 ORDINAL이라 같은 문제가 생긴다
+                    boolean storedAsString = field.tryGetAnnotationOfType(Enumerated.class.getName())
+                            .flatMap(annotation -> annotation.get("value"))
+                            .filter(JavaEnumConstant.class::isInstance)
+                            .map(value -> ((JavaEnumConstant) value).name().equals(EnumType.STRING.name()))
+                            .orElse(false);
+                    events.add(new SimpleConditionEvent(field, storedAsString,
+                            field.getFullName() + "에 @Enumerated(EnumType.STRING)이 없다"));
+                }
+            }
+        };
+    }
+
+    /** 패키지가 basePackage이거나 그 하위 패키지면 true (예: member.domain, member.domain.entity) */
+    private static boolean isInPackage(JavaClass javaClass, String basePackage) {
+        String packageName = javaClass.getPackageName();
+        return packageName.equals(basePackage) || packageName.startsWith(basePackage + ".");
+    }
+
     private static ArchCondition<JavaClass> haveFromEntityFactory() {
         return new ArchCondition<>("public static from(같은 도메인 엔티티)를 가진다") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
                 String domainPackage = ROOT + "." + domainOf(javaClass) + ".domain";
                 // 엔티티가 없는 도메인(예: auth)의 응답은 from(entity)로 만들 수 없으니 검사하지 않는다.
-                // domain 패키지의 enum 같은 클래스는 엔티티로 세지 않도록 @Entity로 판단한다.
+                // 엔티티는 domain/entity에 있으므로 domain과 그 하위 패키지를 모두 본다.
+                // domain/enums의 enum 같은 클래스는 엔티티로 세지 않도록 @Entity로 판단한다.
                 boolean domainHasEntity = classes.stream()
-                        .anyMatch(c -> c.getPackageName().equals(domainPackage) && c.isAnnotatedWith(Entity.class));
+                        .anyMatch(c -> isInPackage(c, domainPackage) && c.isAnnotatedWith(Entity.class));
                 if (!domainHasEntity) {
                     return;
                 }
@@ -192,7 +247,8 @@ class ArchitectureTest {
                         .filter(method -> method.getModifiers().containsAll(Set.of(JavaModifier.PUBLIC, JavaModifier.STATIC)))
                         .filter(method -> method.getRawReturnType().equals(javaClass))
                         .anyMatch(method -> method.getRawParameterTypes().size() == 1
-                                && method.getRawParameterTypes().get(0).getPackageName().equals(domainPackage));
+                                && isInPackage(method.getRawParameterTypes().get(0), domainPackage)
+                                && method.getRawParameterTypes().get(0).isAnnotatedWith(Entity.class));
                 events.add(new SimpleConditionEvent(javaClass, hasFrom,
                         javaClass.getName() + "에 public static from(" + domainPackage + "의 엔티티)가 없다"));
             }

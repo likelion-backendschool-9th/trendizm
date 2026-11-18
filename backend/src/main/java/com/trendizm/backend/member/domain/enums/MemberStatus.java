@@ -1,4 +1,4 @@
-package com.trendizm.backend.member.domain;
+package com.trendizm.backend.member.domain.enums;
 
 /**
  * 회원 이용 상태. users.status에 이름 그대로 저장한다.

@@ -1,6 +1,6 @@
 package com.trendizm.backend.item.application.port.out;
 
-import com.trendizm.backend.item.domain.Item;
+import com.trendizm.backend.item.domain.entity.Item;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

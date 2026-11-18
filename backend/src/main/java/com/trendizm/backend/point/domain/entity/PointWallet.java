@@ -1,4 +1,4 @@
-package com.trendizm.backend.point.domain;
+package com.trendizm.backend.point.domain.entity;
 
 import com.trendizm.backend.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
