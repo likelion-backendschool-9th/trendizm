@@ -70,6 +70,10 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordEncoder.matches(password, credentials.encodedPassword()) || credentials.withdrawn()) {
             throw new BusinessException(AuthErrorCode.LOGIN_FAILED);
         }
+        // 비밀번호가 맞을 때만 알려 준다. 틀린 비밀번호로는 이용 제한 여부를 알 수 없다
+        if (credentials.suspended()) {
+            throw new BusinessException(AuthErrorCode.MEMBER_SUSPENDED);
+        }
         return issueTokens(memberService.getMember(credentials.id()), rememberMe);
     }
 
@@ -88,6 +92,11 @@ public class AuthServiceImpl implements AuthService {
         }
         if (member.withdrawn()) {
             throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        // 로그인 중에 이용이 제한되면 재발급을 막는다. 쓴 리프레시 토큰은 consume에서 이미 지워졌다.
+        // 이미 발급된 액세스 토큰은 만료(30분)까지 쓸 수 있다
+        if (member.suspended()) {
+            throw new BusinessException(AuthErrorCode.MEMBER_SUSPENDED);
         }
         return issueTokens(member, entry.rememberMe());
     }

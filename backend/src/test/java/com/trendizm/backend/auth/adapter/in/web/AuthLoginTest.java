@@ -71,7 +71,7 @@ class AuthLoginTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    /** 로그인할 회원 1명, 탈퇴한 회원 1명. 비밀번호는 둘 다 PASSWORD. @Transactional이라 테스트가 끝나면 롤백된다 */
+    /** 로그인할 회원, 탈퇴한 회원, 이용 제한 회원. 비밀번호는 모두 PASSWORD. @Transactional이라 테스트가 끝나면 롤백된다 */
     @BeforeEach
     void setUp() {
         String encoded = passwordEncoder.encode(PASSWORD);
@@ -79,6 +79,9 @@ class AuthLoginTest {
         Member withdrawn = Member.create("withdrawn@test.com", encoded, "탈퇴회원", false);
         withdrawn.withdraw();
         memberRepository.save(withdrawn);
+        Member suspended = Member.create("suspended@test.com", encoded, "제한회원", false);
+        suspended.suspend();
+        memberRepository.save(suspended);
     }
 
     private ResultActions login(String email, String password, boolean rememberMe) throws Exception {
@@ -231,6 +234,31 @@ class AuthLoginTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
         mockMvc.perform(post("/api/auth/reissue").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    }
+
+    @Test
+    @DisplayName("이용 제한 회원: 비밀번호가 맞으면 403 MEMBER_SUSPENDED, 틀리면 다른 회원과 같은 401 LOGIN_FAILED")
+    void 이용_제한_로그인() throws Exception {
+        login("suspended@test.com", PASSWORD, false)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEMBER_SUSPENDED"));
+        login("suspended@test.com", "wrong-password", false)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+    }
+
+    @Test
+    @DisplayName("로그인 중에 이용이 제한되면 재발급은 403 MEMBER_SUSPENDED이고, 그 리프레시 토큰은 다시 쓸 수 없다")
+    void 이용_제한_재발급() throws Exception {
+        String refresh = read(login("login@test.com", PASSWORD, true), "$.refreshToken");
+        memberRepository.findByEmail("login@test.com").orElseThrow().suspend();
+
+        reissue(refresh)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEMBER_SUSPENDED"));
+        reissue(refresh)
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
     }
