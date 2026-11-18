@@ -145,7 +145,7 @@ class ArchitectureTest {
     }
 
     @Test
-    @DisplayName("XxxResponse는 같은 도메인 엔티티를 받는 정적 팩토리 from(entity)로 만든다")
+    @DisplayName("XxxResponse는 같은 도메인 엔티티를 받는 정적 팩토리 from(entity)로 만든다 (같은 도메인에 엔티티가 없으면 제외)")
     void Response는_from으로_만든다() {
         classes().that().resideInAPackage(ROOT + "..application.dto..")
                 .and().haveSimpleNameEndingWith("Response")
@@ -180,6 +180,13 @@ class ArchitectureTest {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
                 String domainPackage = ROOT + "." + domainOf(javaClass) + ".domain";
+                // 엔티티가 없는 도메인(예: auth)의 응답은 from(entity)로 만들 수 없으니 검사하지 않는다.
+                // domain 패키지의 enum 같은 클래스는 엔티티로 세지 않도록 @Entity로 판단한다.
+                boolean domainHasEntity = classes.stream()
+                        .anyMatch(c -> c.getPackageName().equals(domainPackage) && c.isAnnotatedWith(Entity.class));
+                if (!domainHasEntity) {
+                    return;
+                }
                 boolean hasFrom = javaClass.getMethods().stream()
                         .filter(method -> method.getName().equals("from"))
                         .filter(method -> method.getModifiers().containsAll(Set.of(JavaModifier.PUBLIC, JavaModifier.STATIC)))

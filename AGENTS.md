@@ -53,7 +53,7 @@ com.trendizm.backend.feed
 - 이 구조는 "최소 변경" 같은 다른 규칙보다 우선한다. 비어 있거나 구현체가 하나뿐인 포트 인터페이스도 불필요한 추상화로 보고 생략하지 않는다.
 - 컨트롤러는 `XxxService` 인터페이스에만, 서비스는 `port/out/XxxRepository`에만 의존한다. `XxxServiceImpl`과 `JpaXxxRepository`를 직접 참조하지 않는다.
 - `JpaXxxRepository`는 `JpaRepository`와 out 포트를 함께 상속하는 인터페이스다. 새 조회는 out 포트에 Spring Data 메서드 이름(`findByXxx`)으로 추가한다.
-- 요청 DTO는 `adapter/in/web/dto`, 응답 DTO는 `application/dto`에 record로 둔다. 응답은 `XxxResponse.from(entity)`로 만든다.
+- 요청 DTO는 `adapter/in/web/dto`, 응답 DTO는 `application/dto`에 record로 둔다. 응답은 `XxxResponse.from(entity)`로 만든다. 같은 도메인 `domain` 패키지에 `@Entity`가 없으면(예: `auth`) 이 규칙은 적용하지 않는다.
 - 엔티티는 `protected` 기본 생성자와 정적 팩토리 `create(...)`로 만들고, 수정은 엔티티 메서드를 호출해 변경 감지로 저장한다.
 - 서비스 클래스에는 `@Transactional(readOnly = true)`를 붙이고, 쓰기 메서드에만 `@Transactional`을 붙인다.
 - 다른 도메인은 in 포트(`application/port/XxxService` 인터페이스)로만 호출한다.
