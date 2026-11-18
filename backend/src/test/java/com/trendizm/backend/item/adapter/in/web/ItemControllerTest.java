@@ -1,0 +1,168 @@
+package com.trendizm.backend.item.adapter.in.web;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.trendizm.backend.auth.adapter.out.security.CustomUserDetails;
+import com.trendizm.backend.auth.adapter.out.security.SecurityConfig;
+import com.trendizm.backend.global.response.PageResponse;
+import com.trendizm.backend.item.application.dto.CreateItemQuestionCommand;
+import com.trendizm.backend.item.application.dto.ItemCategoryInfo;
+import com.trendizm.backend.item.application.dto.ItemQuestionQuery;
+import com.trendizm.backend.item.application.dto.ItemQuestionResponse;
+import com.trendizm.backend.item.application.port.ItemService;
+import com.trendizm.backend.item.domain.enums.ItemCategory;
+import com.trendizm.backend.item.domain.enums.ItemSubcategory;
+import java.time.LocalDateTime;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(ItemController.class)
+@Import(SecurityConfig.class)
+class ItemControllerTest {
+
+    private static final CustomUserDetails LOGIN_USER = new CustomUserDetails(7L, "member@test.com", "encoded", List.of());
+
+    private static final ItemQuestionResponse QUESTION = new ItemQuestionResponse(1L,
+            ItemCategoryInfo.of(ItemCategory.FASHION), ItemCategoryInfo.of(ItemSubcategory.CLOTHING),
+            "양말 추천해주세요", "내용", "질문자", false, 0, 0, LocalDateTime.now(), LocalDateTime.now());
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private ItemService itemService;
+
+    @Test
+    @DisplayName("로그인하지 않아도 질문 글 상세를 볼 수 있고, 보는 사람 id는 null로 넘긴다")
+    void 비로그인_상세() throws Exception {
+        given(itemService.getQuestion(eq(1L), isNull())).willReturn(QUESTION);
+
+        mockMvc.perform(get("/api/items/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.subcategory.slug").value("clothing"))
+                .andExpect(jsonPath("$.subcategory.label").value("의류"));
+    }
+
+    @Test
+    @DisplayName("로그인하면 보는 사람 id를 넘긴다")
+    void 로그인_상세() throws Exception {
+        given(itemService.getQuestion(1L, 7L)).willReturn(QUESTION.withMine(true));
+
+        mockMvc.perform(get("/api/items/1").with(user(LOGIN_USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mine").value(true));
+    }
+
+    @Test
+    @DisplayName("로그인하지 않아도 댓글·추천 아이템 목록을 볼 수 있다")
+    void 비로그인_목록() throws Exception {
+        given(itemService.getComments(eq(1L), isNull(), eq(0), eq(20)))
+                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+        given(itemService.getRecommendations(eq(1L), isNull())).willReturn(List.of());
+
+        mockMvc.perform(get("/api/items/1/comments")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/items/1/recommendations")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("목록 필터는 code 값으로 받는다")
+    void 목록_필터() throws Exception {
+        given(itemService.getQuestions(new ItemQuestionQuery(ItemCategory.FASHION, ItemSubcategory.SHOES, 1, 10)))
+                .willReturn(new PageResponse<>(List.of(), 1, 10, 0, 0, false));
+
+        mockMvc.perform(get("/api/items")
+                        .param("category", "FASHION").param("subcategory", "SHOES")
+                        .param("page", "1").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(1));
+    }
+
+    @Test
+    @DisplayName("없는 카테고리 값이면 400")
+    void 잘못된_카테고리() throws Exception {
+        mockMvc.perform(get("/api/items").param("category", "FOOD"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(itemService);
+    }
+
+    @Test
+    @DisplayName("로그인하지 않으면 글·댓글·공감·추천을 등록할 수 없다")
+    void 비로그인_쓰기() throws Exception {
+        mockMvc.perform(post("/api/items").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subcategory\":\"CLOTHING\",\"title\":\"제목\",\"content\":\"내용\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/items/1/comments").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"댓글\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/items/comments/1/likes")).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete("/api/items/comments/1/likes")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/items/1/recommendations").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"양말\",\"description\":\"설명\"}"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(itemService);
+    }
+
+    @Test
+    @DisplayName("질문 글을 작성하면 201과 만든 글을 돌려주고, 앞뒤 공백은 지운다")
+    void 질문_작성() throws Exception {
+        given(itemService.createQuestion(any())).willReturn(QUESTION);
+
+        mockMvc.perform(post("/api/items").with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subcategory\":\"CLOTHING\",\"title\":\"  양말 추천해주세요 \",\"content\":\"내용\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1));
+        verify(itemService).createQuestion(
+                new CreateItemQuestionCommand(7L, ItemSubcategory.CLOTHING, "양말 추천해주세요", "내용"));
+    }
+
+    @Test
+    @DisplayName("제목이 비어 있으면 400 INVALID_INPUT")
+    void 빈_제목() throws Exception {
+        mockMvc.perform(post("/api/items").with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subcategory\":\"CLOTHING\",\"title\":\" \",\"content\":\"내용\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verifyNoInteractions(itemService);
+    }
+
+    @Test
+    @DisplayName("추천 아이템 링크가 http(s) 주소가 아니면 400 INVALID_INPUT")
+    void 잘못된_링크() throws Exception {
+        mockMvc.perform(post("/api/items/1/recommendations").with(user(LOGIN_USER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"양말\",\"description\":\"설명\",\"linkUrl\":\"javascript:alert(1)\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verifyNoInteractions(itemService);
+    }
+
+    @Test
+    @DisplayName("댓글 공감·취소는 204이고 로그인한 회원 id를 넘긴다")
+    void 공감() throws Exception {
+        mockMvc.perform(post("/api/items/comments/3/likes").with(user(LOGIN_USER)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/items/comments/3/likes").with(user(LOGIN_USER)))
+                .andExpect(status().isNoContent());
+
+        verify(itemService).likeComment(3L, 7L);
+        verify(itemService).unlikeComment(3L, 7L);
+    }
+}
