@@ -23,6 +23,15 @@ class MemberTest {
     }
 
     @Test
+    @DisplayName("이메일은 앞뒤 공백을 지우고 소문자로, 닉네임은 앞뒤 공백을 지워 저장한다")
+    void 이메일_닉네임_정리() {
+        Member member = Member.create("  New@Test.COM ", "encoded", " 닉네임 ", false);
+
+        assertThat(member.getEmail()).isEqualTo("new@test.com");
+        assertThat(member.getNickname()).isEqualTo("닉네임");
+    }
+
+    @Test
     @DisplayName("비밀번호를 바꾸면 새 값으로 바뀐다")
     void 비밀번호_변경() {
         Member member = Member.create("a@test.com", "old", "닉네임", false);

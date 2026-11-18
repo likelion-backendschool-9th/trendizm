@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -81,9 +82,23 @@ public class GlobalExceptionHandler {
         return respond(CommonErrorCode.FORBIDDEN);
     }
 
-    /** 예상하지 못한 예외. 내부 내용은 응답에 보이지 않고 로그로만 남긴다 */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException e) {
+        return respond(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE);
+    }
+
+    /**
+     * 예상하지 못한 예외. 내부 내용은 응답에 보이지 않고 로그로만 남긴다.
+     * 단, 위에서 따로 처리하지 않은 스프링 MVC 예외(헤더 누락, 406 등)는 스프링이 정한 4xx 상태를 그대로 쓴다.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
+        if (e instanceof org.springframework.web.ErrorResponse springError
+                && springError.getStatusCode().is4xxClientError()) {
+            CommonErrorCode errorCode = CommonErrorCode.BAD_REQUEST;
+            return ResponseEntity.status(springError.getStatusCode())
+                    .body(ErrorResponse.of(errorCode));
+        }
         log.error("처리하지 못한 예외", e);
         return respond(CommonErrorCode.INTERNAL_ERROR);
     }

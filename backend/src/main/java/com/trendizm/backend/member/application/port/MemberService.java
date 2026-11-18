@@ -1,12 +1,13 @@
 package com.trendizm.backend.member.application.port;
 
 import com.trendizm.backend.member.application.dto.MemberInfo;
+import com.trendizm.backend.member.application.dto.RegisterMemberCommand;
 import java.util.Collection;
 import java.util.Map;
 
 /**
  * 회원 유스케이스 (in 포트). 다른 도메인은 회원 정보를 이 인터페이스로만 가져간다.
- * 회원가입·로그인(auth), 마이페이지 기능은 각 작업에서 메서드를 추가한다.
+ * 로그인(auth), 마이페이지 기능은 각 작업에서 메서드를 추가한다.
  */
 public interface MemberService {
 
@@ -19,4 +20,17 @@ public interface MemberService {
      *     members.get(comment.getUserId())
      */
     Map<Long, MemberInfo> getMembers(Collection<Long> memberIds);
+
+    /**
+     * 회원을 등록하고 id를 돌려준다.
+     * 이메일이 이미 있으면 DUPLICATE_EMAIL, 닉네임이 이미 있으면 DUPLICATE_NICKNAME,
+     * 동시에 같은 값으로 가입해 DB에서 막히면 DUPLICATE_MEMBER
+     */
+    Long register(RegisterMemberCommand command);
+
+    /** 가입에 쓸 수 있는 이메일인지. 대소문자·앞뒤 공백은 무시한다 */
+    boolean isEmailAvailable(String email);
+
+    /** 가입에 쓸 수 있는 닉네임인지. 앞뒤 공백은 무시한다 */
+    boolean isNicknameAvailable(String nickname);
 }
