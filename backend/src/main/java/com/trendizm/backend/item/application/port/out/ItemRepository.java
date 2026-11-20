@@ -1,21 +1,18 @@
 package com.trendizm.backend.item.application.port.out;
 
 import com.trendizm.backend.item.domain.entity.Item;
-import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import java.util.Collection;
+import java.util.List;
 
-/**
- * 구현체는 adapter/out/persistence/JpaItemRepository (Spring Data가 자동 구현).
- * 메서드 이름을 Spring Data 규칙(findByXxx 등)대로 추가하면 쿼리를 따로 쓰지 않아도 된다.
- */
+/** 추천 아이템(items) 저장소. 구현체는 adapter/out/persistence/JpaItemRepository (Spring Data가 자동 구현) */
 public interface ItemRepository {
 
     Item save(Item item);
 
-    Optional<Item> findById(Long id);
+    List<Item> findByQuestionIdOrderByIdAsc(Long questionId);
 
-    Page<Item> findAll(Pageable pageable);
+    long countByQuestionId(Long questionId);
 
-    void delete(Item item);
+    /** 질문 id별 추천 아이템 수. 추천이 없는 질문은 결과에 없다 */
+    List<CountByKey> countGroupByQuestionId(Collection<Long> questionIds);
 }
