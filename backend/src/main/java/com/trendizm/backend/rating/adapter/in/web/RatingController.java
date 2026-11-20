@@ -1,24 +1,27 @@
 package com.trendizm.backend.rating.adapter.in.web;
 
-import com.trendizm.backend.rating.adapter.in.web.dto.RatingRequest;
-import com.trendizm.backend.rating.application.dto.RatingResponse;
+import com.trendizm.backend.global.response.PageResponse;
+import com.trendizm.backend.rating.application.dto.RatingContentQuery;
+import com.trendizm.backend.rating.application.dto.RatingContentResponse;
+import com.trendizm.backend.rating.application.dto.RatingContentSummaryResponse;
 import com.trendizm.backend.rating.application.port.RatingService;
-import jakarta.validation.Valid;
+import com.trendizm.backend.rating.domain.enums.RatingContentCategory;
+import com.trendizm.backend.rating.domain.enums.RatingContentStatus;
+import com.trendizm.backend.rating.domain.enums.RatingContentSubcategory;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 로그인 없이 모든 요청 허용 (auth/adapter/out/security/SecurityConfig) */
+/**
+ * 호불호 평점 API. 경로의 ratingId는 콘텐츠(rating_contents) id다.
+ * 조회는 로그인 없이 허용한다 (auth/adapter/out/security/SecurityConfig).
+ * 콘텐츠 등록·숨김은 관리자 API(/api/admin/ratings)에서 RatingService를 호출한다.
+ */
 @RestController
 @RequestMapping("/api/ratings")
 @RequiredArgsConstructor
@@ -26,30 +29,21 @@ public class RatingController {
 
     private final RatingService ratingService;
 
+    /** 콘텐츠 목록 (최신 등록순). category·subcategory·status는 code 값(예: MEDIA, DRAMA, ONGOING)이고 비우면 전체다 */
     @GetMapping
-    public Page<RatingResponse> getRatings(Pageable pageable) {
-        return ratingService.getRatings(pageable);
+    public PageResponse<RatingContentSummaryResponse> getContents(
+            @RequestParam(required = false) RatingContentCategory category,
+            @RequestParam(required = false) RatingContentSubcategory subcategory,
+            @RequestParam(required = false) RatingContentStatus status,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
+            @RequestParam(defaultValue = "20")
+            @Min(value = 1, message = "size는 1 이상이어야 합니다.")
+            @Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
+        return ratingService.getContents(new RatingContentQuery(category, subcategory, status, page, size));
     }
 
     @GetMapping("/{ratingId}")
-    public RatingResponse getRating(@PathVariable Long ratingId) {
-        return ratingService.getRating(ratingId);
-    }
-
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Long createRating(@Valid @RequestBody RatingRequest request) {
-        return ratingService.createRating();
-    }
-
-    @PutMapping("/{ratingId}")
-    public void updateRating(@PathVariable Long ratingId, @Valid @RequestBody RatingRequest request) {
-        ratingService.updateRating(ratingId);
-    }
-
-    @DeleteMapping("/{ratingId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteRating(@PathVariable Long ratingId) {
-        ratingService.deleteRating(ratingId);
+    public RatingContentResponse getContent(@PathVariable Long ratingId) {
+        return ratingService.getContent(ratingId);
     }
 }

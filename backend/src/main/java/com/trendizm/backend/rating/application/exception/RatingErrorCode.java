@@ -1,0 +1,36 @@
+package com.trendizm.backend.rating.application.exception;
+
+import com.trendizm.backend.global.error.ErrorCode;
+import org.springframework.http.HttpStatus;
+
+/** 호불호 평점 도메인 에러. 예: throw new BusinessException(RatingErrorCode.RATING_CONTENT_NOT_FOUND); */
+public enum RatingErrorCode implements ErrorCode {
+
+    /** 없거나 관리자가 숨긴 콘텐츠 */
+    RATING_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "콘텐츠를 찾을 수 없습니다."),
+    /** 목록 필터의 대분류와 소분류가 서로 맞지 않는 경우 */
+    RATING_CATEGORY_MISMATCH(HttpStatus.BAD_REQUEST, "대분류와 소분류가 맞지 않습니다.");
+
+    private final HttpStatus status;
+    private final String message;
+
+    RatingErrorCode(HttpStatus status, String message) {
+        this.status = status;
+        this.message = message;
+    }
+
+    @Override
+    public HttpStatus status() {
+        return status;
+    }
+
+    @Override
+    public String code() {
+        return name();
+    }
+
+    @Override
+    public String message() {
+        return message;
+    }
+}
