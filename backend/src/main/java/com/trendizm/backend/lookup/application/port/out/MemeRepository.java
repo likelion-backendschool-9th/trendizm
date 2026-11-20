@@ -1,6 +1,7 @@
 package com.trendizm.backend.lookup.application.port.out;
 
 import com.trendizm.backend.lookup.domain.entity.Meme;
+import com.trendizm.backend.lookup.domain.enums.MemeStatus;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,7 +16,9 @@ public interface MemeRepository {
 
     Optional<Meme> findById(Long id);
 
-    Page<Meme> findAll(Pageable pageable);
+    Optional<Meme> findByWordAndStatus(String word, MemeStatus status);
 
-    void delete(Meme meme);
+    Page<Meme> findByStatus(MemeStatus status, Pageable pageable);
+
+    Page<Meme> findByStatusAndWordContaining(MemeStatus status, String keyword, Pageable pageable);
 }
