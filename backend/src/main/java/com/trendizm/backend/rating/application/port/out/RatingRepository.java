@@ -20,6 +20,9 @@ public interface RatingRepository {
 
     Optional<Rating> findByContentIdAndUserId(Long contentId, Long userId);
 
+    /** 바뀐 내용을 DB에 바로 반영한다. updated_at(@LastModifiedDate)은 이때 채워진다 (JpaRepository가 구현) */
+    void flush();
+
     /**
      * 후기를 추가한다. (content_id, user_id)가 이미 있으면 아무것도 하지 않는다(동시에 처음 작성해도 한 줄만 생긴다).
      * 값 검사는 하지 않으므로 Rating.create로 먼저 검사한 값을 넘긴다.

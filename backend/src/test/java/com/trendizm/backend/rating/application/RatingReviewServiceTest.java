@@ -15,8 +15,11 @@ import com.trendizm.backend.rating.application.dto.RegisterRatingContentCommand;
 import com.trendizm.backend.rating.application.dto.SaveRatingReviewCommand;
 import com.trendizm.backend.rating.application.exception.RatingErrorCode;
 import com.trendizm.backend.rating.application.port.RatingService;
+import com.trendizm.backend.rating.application.port.out.RatingRepository;
 import com.trendizm.backend.rating.application.port.ReviewSort;
 import com.trendizm.backend.rating.domain.enums.Sentiment;
+import jakarta.persistence.EntityManager;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +40,12 @@ class RatingReviewServiceTest {
 
     @Autowired
     private PointService pointService;
+
+    @Autowired
+    private RatingRepository ratingRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private Long contentId;
     private Long alice;
@@ -161,5 +170,20 @@ class RatingReviewServiceTest {
         assertThatThrownBy(() -> save(alice, Sentiment.LIKE, 6)).isInstanceOf(IllegalArgumentException.class);
         assertThat(ratingService.getReviews(new RatingReviewQuery(contentId, null, null, null, 0, 20))
                 .totalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("후기를 수정하면 응답의 수정 시각이 DB에 저장된 새 수정 시각과 같다")
+    void 수정_시각() throws InterruptedException {
+        RatingReviewSaveResult created = save(alice, Sentiment.LIKE, 5);
+        entityManager.flush();
+        Thread.sleep(10); // 수정 시각이 처음 값과 달라지도록 잠깐 기다린다
+
+        RatingReviewSaveResult updated = save(alice, Sentiment.DISLIKE, 1);
+        entityManager.clear();
+
+        LocalDateTime saved = ratingRepository.findById(updated.review().id()).orElseThrow().getUpdatedAt();
+        assertThat(updated.review().updatedAt()).isEqualTo(saved);
+        assertThat(updated.review().updatedAt()).isAfter(created.review().updatedAt());
     }
 }

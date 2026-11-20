@@ -130,6 +130,8 @@ public class RatingServiceImpl implements RatingService {
         if (!created) {
             review.update(checked.getSentiment(), checked.getScore(), checked.getTitle(), checked.getBody(),
                     checked.getProgress());
+            // updated_at은 flush할 때 채워지므로, 응답에 새 수정 시각이 나가도록 먼저 반영한다
+            ratingRepository.flush();
         }
 
         int reward = 0;
