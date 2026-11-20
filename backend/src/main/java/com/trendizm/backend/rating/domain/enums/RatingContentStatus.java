@@ -1,6 +1,9 @@
 package com.trendizm.backend.rating.domain.enums;
 
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 콘텐츠 진행 상태 (ERD rating_contents.status, varchar(30)). 관리자 숨김(visibility)과는 별개다.
@@ -39,5 +42,15 @@ public enum RatingContentStatus {
     /** 대분류에 맞는 화면 이름 */
     public String labelFor(RatingContentCategory category) {
         return labels.get(category);
+    }
+
+    /** API 요청에 쓰는 값. 예: ONGOING → ongoing */
+    public String getSlug() {
+        return name().toLowerCase(Locale.ROOT);
+    }
+
+    /** slug로 찾는다. 예: "ongoing" → ONGOING. 없으면 빈 Optional */
+    public static Optional<RatingContentStatus> fromSlug(String slug) {
+        return Arrays.stream(values()).filter(value -> value.getSlug().equals(slug)).findFirst();
     }
 }

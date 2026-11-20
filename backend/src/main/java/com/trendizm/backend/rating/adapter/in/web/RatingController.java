@@ -1,9 +1,11 @@
 package com.trendizm.backend.rating.adapter.in.web;
 
+import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.rating.application.dto.RatingContentQuery;
 import com.trendizm.backend.rating.application.dto.RatingContentResponse;
 import com.trendizm.backend.rating.application.dto.RatingContentSummaryResponse;
+import com.trendizm.backend.rating.application.exception.RatingErrorCode;
 import com.trendizm.backend.rating.application.port.RatingService;
 import com.trendizm.backend.rating.domain.enums.RatingContentCategory;
 import com.trendizm.backend.rating.domain.enums.RatingContentStatus;
@@ -29,17 +31,28 @@ public class RatingController {
 
     private final RatingService ratingService;
 
-    /** 콘텐츠 목록 (최신 등록순). category·subcategory·status는 code 값(예: MEDIA, DRAMA, ONGOING)이고 비우면 전체다 */
+    /**
+     * 콘텐츠 목록 (최신 등록순). category·subcategory·status는 slug 값(예: media, drama, ongoing)이고 비우면 전체다.
+     * 없는 slug면 RATING_INVALID_CATEGORY·RATING_INVALID_STATUS
+     */
     @GetMapping
     public PageResponse<RatingContentSummaryResponse> getContents(
-            @RequestParam(required = false) RatingContentCategory category,
-            @RequestParam(required = false) RatingContentSubcategory subcategory,
-            @RequestParam(required = false) RatingContentStatus status,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String subcategory,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
             @Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
-        return ratingService.getContents(new RatingContentQuery(category, subcategory, status, page, size));
+        RatingContentCategory parsedCategory = category == null ? null : RatingContentCategory.fromSlug(category)
+                .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_CATEGORY));
+        RatingContentSubcategory parsedSubcategory = subcategory == null ? null
+                : RatingContentSubcategory.fromSlug(subcategory)
+                        .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_CATEGORY));
+        RatingContentStatus parsedStatus = status == null ? null : RatingContentStatus.fromSlug(status)
+                .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_STATUS));
+        return ratingService.getContents(
+                new RatingContentQuery(parsedCategory, parsedSubcategory, parsedStatus, page, size));
     }
 
     @GetMapping("/{ratingId}")

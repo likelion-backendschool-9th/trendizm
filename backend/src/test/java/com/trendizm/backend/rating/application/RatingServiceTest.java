@@ -62,9 +62,9 @@ class RatingServiceTest {
         RatingContentResponse created = ratingService.registerContent(new RegisterRatingContentCommand(
                 RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING, "드라마", null, null, null, null, null));
 
-        assertThat(created.category().code()).isEqualTo("MEDIA");
+        assertThat(created.category().slug()).isEqualTo("media");
         assertThat(created.subcategory().slug()).isEqualTo("drama");
-        assertThat(created.status().code()).isEqualTo("ONGOING");
+        assertThat(created.status().slug()).isEqualTo("ongoing");
         assertThat(created.status().label()).isEqualTo("방영중");
         assertThat(created.extra()).isEmpty();
         assertThat(created.stats()).isEqualTo(SentimentStats.EMPTY);

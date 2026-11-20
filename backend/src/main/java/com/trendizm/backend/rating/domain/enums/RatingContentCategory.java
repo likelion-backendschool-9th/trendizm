@@ -1,6 +1,8 @@
 package com.trendizm.backend.rating.domain.enums;
 
+import java.util.Arrays;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * 평점 콘텐츠 대분류 (ERD rating_contents.category, varchar(30)).
@@ -28,5 +30,10 @@ public enum RatingContentCategory {
     /** 예: MEDIA → media */
     public String getSlug() {
         return name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /** slug로 찾는다. 예: "media" → MEDIA. 없으면 빈 Optional */
+    public static Optional<RatingContentCategory> fromSlug(String slug) {
+        return Arrays.stream(values()).filter(value -> value.getSlug().equals(slug)).findFirst();
     }
 }

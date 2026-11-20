@@ -44,27 +44,36 @@ class RatingControllerTest {
         mockMvc.perform(get("/api/ratings/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.subcategory.slug").value("drama"))
+                .andExpect(jsonPath("$.status.slug").value("ongoing"))
                 .andExpect(jsonPath("$.status.label").value("방영중"))
                 .andExpect(jsonPath("$.stats.likeCount").value(0));
     }
 
     @Test
-    @DisplayName("목록 필터는 code 값으로 받는다")
+    @DisplayName("목록 필터는 slug 값으로 받는다")
     void 목록_필터() throws Exception {
         given(ratingService.getContents(new RatingContentQuery(RatingContentCategory.MEDIA,
                 RatingContentSubcategory.DRAMA, RatingContentStatus.ENDED, 1, 10)))
                 .willReturn(new PageResponse<>(List.of(), 1, 10, 0, 0, false));
 
-        mockMvc.perform(get("/api/ratings").param("category", "MEDIA").param("subcategory", "DRAMA")
-                        .param("status", "ENDED").param("page", "1").param("size", "10"))
+        mockMvc.perform(get("/api/ratings").param("category", "media").param("subcategory", "drama")
+                        .param("status", "ended").param("page", "1").param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(1));
     }
 
     @Test
-    @DisplayName("없는 진행 상태 값이나 범위를 벗어난 size는 400")
+    @DisplayName("없는 slug(대문자 code 포함)나 범위를 벗어난 size는 400")
     void 잘못된_값() throws Exception {
-        mockMvc.perform(get("/api/ratings").param("status", "AIRING")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/ratings").param("category", "MEDIA"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RATING_INVALID_CATEGORY"));
+        mockMvc.perform(get("/api/ratings").param("subcategory", "kdrama"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RATING_INVALID_CATEGORY"));
+        mockMvc.perform(get("/api/ratings").param("status", "airing"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RATING_INVALID_STATUS"));
         mockMvc.perform(get("/api/ratings").param("size", "101")).andExpect(status().isBadRequest());
         verifyNoInteractions(ratingService);
     }
