@@ -49,7 +49,8 @@ public class ItemController {
     private final ItemService itemService;
 
     /**
-     * 질문 글 목록 (최신순). category·subcategory는 slug 값(예: fashion, eyewear-accessories)이고 비우면 전체다.
+     * 질문 글 목록 (최신순). category·subcategory는 slug 값(예: fashion, eyewear-accessories)이고
+     * 보내지 않거나 빈 값(?category=)이면 전체다.
      * 없는 slug면 ITEM_INVALID_CATEGORY
      */
     @GetMapping
@@ -60,9 +61,9 @@ public class ItemController {
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
             @Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
-        ItemCategory parsedCategory = category == null ? null : ItemCategory.fromSlug(category)
+        ItemCategory parsedCategory = isBlank(category) ? null : ItemCategory.fromSlug(category.strip())
                 .orElseThrow(() -> new BusinessException(ItemErrorCode.ITEM_INVALID_CATEGORY));
-        ItemSubcategory parsedSubcategory = subcategory == null ? null : ItemSubcategory.fromSlug(subcategory)
+        ItemSubcategory parsedSubcategory = isBlank(subcategory) ? null : ItemSubcategory.fromSlug(subcategory.strip())
                 .orElseThrow(() -> new BusinessException(ItemErrorCode.ITEM_INVALID_CATEGORY));
         return itemService.getQuestions(new ItemQuestionQuery(parsedCategory, parsedSubcategory, page, size));
     }
@@ -130,5 +131,10 @@ public class ItemController {
             @AuthenticationPrincipal(expression = "id") Long userId,
             @Valid @RequestBody CreateItemRequest request) {
         return itemService.createRecommendation(request.toCommand(itemId, userId));
+    }
+
+    /** 화면에서 "전체"를 고르면 ?category= 처럼 빈 값이 올 수 있어서, 보내지 않은 것과 같게 본다 */
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

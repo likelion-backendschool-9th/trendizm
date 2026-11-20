@@ -201,4 +201,14 @@ class ItemControllerTest {
         verify(itemService).createRecommendation(new CreateItemCommand(1L, 7L, "양말", null, null, List.of(), "설명",
                 "Https://img.test/a.jpg", "HTTP://shop.test/a"));
     }
+
+    @Test
+    @DisplayName("빈 필터 값(?category=)은 보내지 않은 것과 같이 전체로 본다")
+    void 빈_필터() throws Exception {
+        given(itemService.getQuestions(new ItemQuestionQuery(null, null, 0, 20)))
+                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+
+        mockMvc.perform(get("/api/items").param("category", "").param("subcategory", " "))
+                .andExpect(status().isOk());
+    }
 }
