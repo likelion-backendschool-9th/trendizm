@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -23,7 +24,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  *
  * 접근 규칙(위에서부터 먼저 맞는 규칙이 적용된다):
  * 1. /api/auth/** (가입·로그인·재발급) → 누구나
- * 2. feed·item·lookup·ranking·rating → 누구나 (모든 메서드)
+ * 2. feed·item·lookup·ranking·rating 조회(GET) → 누구나. 쓰기(POST·PUT·PATCH·DELETE)는 로그인 필요
  * 3. /api/admin/** → ADMIN만
  * 4. 그 외(notification, members 등) → 로그인 필요
  * 막히면 SecurityErrorHandler가 401·403을 { code, message }로 응답한다.
@@ -57,7 +58,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers(
+                        // 공개 경로는 조회만 허용한다. 메서드를 빼면 비로그인 쓰기·삭제까지 열린다
+                        .requestMatchers(HttpMethod.GET,
                                 "/api/feeds/**", "/api/items/**", "/api/lookup/**",
                                 "/api/rankings/**", "/api/ratings/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
