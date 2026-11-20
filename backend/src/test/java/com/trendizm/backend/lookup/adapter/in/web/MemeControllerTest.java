@@ -37,11 +37,11 @@ class MemeControllerTest {
     private MemeService memeService;
 
     @Test
-    @DisplayName("로그인 없이 단어로 문서를 조회한다 (한글 단어는 URL 인코딩해서 보낸다)")
+    @DisplayName("로그인 없이 q로 단어가 같은 문서를 조회한다")
     void 단어로_조회() throws Exception {
         given(memeService.getMeme("알잘딱깔센")).willReturn(MEME);
 
-        mockMvc.perform(get("/api/lookup/memes/{word}", "알잘딱깔센"))
+        mockMvc.perform(get("/api/lookup/memes").param("q", "알잘딱깔센"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.word").value("알잘딱깔센"))
                 .andExpect(jsonPath("$.title").value("영상 제목"));
@@ -52,9 +52,27 @@ class MemeControllerTest {
     void 없는_단어() throws Exception {
         given(memeService.getMeme("없는단어")).willThrow(new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
 
-        mockMvc.perform(get("/api/lookup/memes/{word}", "없는단어"))
+        mockMvc.perform(get("/api/lookup/memes").param("q", "없는단어"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("MEME_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("'/'나 '%'가 들어간 단어도 q로 조회할 수 있다")
+    void 특수문자_단어() throws Exception {
+        given(memeService.getMeme("50%/할인")).willReturn(MEME);
+
+        mockMvc.perform(get("/api/lookup/memes").param("q", "50%/할인"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("q가 비어 있으면 400 INVALID_INPUT")
+    void 빈_단어() throws Exception {
+        mockMvc.perform(get("/api/lookup/memes").param("q", " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verifyNoInteractions(memeService);
     }
 
     @Test

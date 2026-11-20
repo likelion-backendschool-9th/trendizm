@@ -20,6 +20,15 @@ class MemeTest {
     }
 
     @Test
+    @DisplayName("단어는 소문자로 저장하고 띄어쓰기는 그대로 둔다")
+    void 단어_정규화() {
+        Meme meme = Meme.create(" TMI ", 1L, null, null, null);
+
+        assertThat(meme.getWord()).isEqualTo("tmi");
+        assertThat(Meme.normalizeWord(" 알잘딱 깔센 ")).isEqualTo("알잘딱 깔센");
+    }
+
+    @Test
     @DisplayName("숨김과 해제")
     void 숨김_해제() {
         Meme meme = Meme.create("중꺾마", 1L, null, null, null);

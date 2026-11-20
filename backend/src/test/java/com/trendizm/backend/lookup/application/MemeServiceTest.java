@@ -51,11 +51,10 @@ class MemeServiceTest {
     }
 
     @Test
-    @DisplayName("대소문자는 무시하고 찾고, 저장한 표기 그대로 보여 준다")
+    @DisplayName("단어는 소문자로 저장하고, 대소문자와 관계없이 찾는다")
     void 대소문자_무시() {
-        MemeResponse meme = memeService.getMeme("tmi");
-
-        assertThat(meme.word()).isEqualTo("TMI");
+        assertThat(memeService.getMeme("Tmi").word()).isEqualTo("tmi");
+        assertThat(memeService.getMeme("tmi").word()).isEqualTo("tmi");
     }
 
     @Test
@@ -91,7 +90,7 @@ class MemeServiceTest {
         PageResponse<MemeResponse> page = memeService.getMemes(null, 0, 20);
 
         assertThat(page.content()).extracting(MemeResponse::word)
-                .containsExactly("알빠노", "중꺾마", "알잘딱깔센", "TMI");
+                .containsExactly("알빠노", "중꺾마", "알잘딱깔센", "tmi");
         assertThat(page.totalElements()).isEqualTo(4);
     }
 
@@ -107,9 +106,9 @@ class MemeServiceTest {
     @Test
     @DisplayName("검색도 대소문자를 무시한다")
     void 검색_대소문자_무시() {
-        PageResponse<MemeResponse> page = memeService.getMemes("tm", 0, 20);
+        PageResponse<MemeResponse> page = memeService.getMemes("TM", 0, 20);
 
-        assertThat(page.content()).extracting(MemeResponse::word).containsExactly("TMI");
+        assertThat(page.content()).extracting(MemeResponse::word).containsExactly("tmi");
     }
 
     @Test
@@ -117,7 +116,7 @@ class MemeServiceTest {
     void 페이지() {
         PageResponse<MemeResponse> page = memeService.getMemes("", 1, 3);
 
-        assertThat(page.content()).extracting(MemeResponse::word).containsExactly("TMI");
+        assertThat(page.content()).extracting(MemeResponse::word).containsExactly("tmi");
         assertThat(page.page()).isEqualTo(1);
         assertThat(page.hasNext()).isFalse();
     }

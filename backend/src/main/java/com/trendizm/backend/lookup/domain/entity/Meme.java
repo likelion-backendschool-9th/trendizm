@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.Locale;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -66,13 +67,13 @@ public class Meme extends BaseCreatedEntity {
     }
 
     /**
-     * 단어 저장·조회용 형태: 앞뒤 공백만 지운다.
-     * - 대소문자: 입력한 대로 저장하고(화면에 TMI 그대로), 조회할 때만 무시한다(MemeRepository의 IgnoreCase 메서드).
-     *   word UNIQUE는 대소문자를 구분하므로, 문서를 만들 때(첫 의견 작성) 대소문자를 무시하고 먼저 찾아 중복을 막는다.
+     * 단어 저장·조회·검색에 공통으로 쓰는 형태: 앞뒤 공백을 지우고 소문자로 바꾼다.
+     * - 대소문자: 소문자로 저장해서 TMI와 tmi는 같은 문서다. word UNIQUE가 DB에서 중복을 막는다.
      * - 띄어쓰기: 다른 단어로 본다("알잘딱 깔센"과 "알잘딱깔센"은 다른 문서).
+     * Locale.ROOT: 실행 환경 언어 설정(예: 터키어)에 따라 i·I 변환이 달라지지 않게 한다.
      */
     public static String normalizeWord(String word) {
-        return word.strip();
+        return word.strip().toLowerCase(Locale.ROOT);
     }
 
     /** 관리자 숨김. 숨김·해제 API는 관리자 기능(12.x)에서 만든다 */
