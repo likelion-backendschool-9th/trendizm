@@ -4,10 +4,14 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.rating.application.dto.RatingContentQuery;
 import com.trendizm.backend.rating.application.dto.RatingContentResponse;
 import com.trendizm.backend.rating.application.dto.RatingContentSummaryResponse;
+import com.trendizm.backend.rating.application.dto.RatingReviewQuery;
+import com.trendizm.backend.rating.application.dto.RatingReviewResponse;
+import com.trendizm.backend.rating.application.dto.RatingReviewSaveResult;
 import com.trendizm.backend.rating.application.dto.RegisterRatingContentCommand;
+import com.trendizm.backend.rating.application.dto.SaveRatingReviewCommand;
 
 /**
- * 호불호 평점 유스케이스 (in 포트). 지금은 콘텐츠 등록·숨김·조회를 다루고, 후기·후기 공감은 다음 작업에서 추가한다.
+ * 호불호 평점 유스케이스 (in 포트). 콘텐츠 등록·숨김·조회와 후기 작성·조회를 다룬다. 후기 공감은 다음 작업에서 추가한다.
  * 관리자가 숨긴 콘텐츠(HIDDEN)는 일반 조회에서 없는 콘텐츠로 취급한다(RATING_CONTENT_NOT_FOUND).
  */
 public interface RatingService {
@@ -30,4 +34,13 @@ public interface RatingService {
      * 숨긴 콘텐츠도 찾으며, 없으면 RATING_CONTENT_NOT_FOUND
      */
     void changeContentVisibility(Long contentId, boolean visible);
+
+    /** 공개 콘텐츠의 후기 목록. 호/불호로 거르고 정렬한다 */
+    PageResponse<RatingReviewResponse> getReviews(RatingReviewQuery query);
+
+    /**
+     * 후기 작성·수정. 콘텐츠당 한 회원의 후기는 하나라서, 이미 있으면 수정한다.
+     * 처음 작성할 때만 후기 보상 포인트를 준다. 숨겼거나 없는 콘텐츠면 RATING_CONTENT_NOT_FOUND
+     */
+    RatingReviewSaveResult saveReview(SaveRatingReviewCommand command);
 }

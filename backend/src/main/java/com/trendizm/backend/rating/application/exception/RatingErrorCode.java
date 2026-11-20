@@ -14,6 +14,10 @@ public enum RatingErrorCode implements ErrorCode {
     RATING_INVALID_STATUS(HttpStatus.BAD_REQUEST, "없는 진행 상태입니다."),
     /** 추가 정보에 없는 키나 그 소분류에서 쓸 수 없는 키가 있는 경우 (RatingContentExtraKey) */
     RATING_INVALID_EXTRA_KEY(HttpStatus.BAD_REQUEST, "이 콘텐츠에 넣을 수 없는 추가 정보가 있습니다."),
+    /** 없는 호/불호 slug (like·dislike가 아님) */
+    RATING_INVALID_SENTIMENT(HttpStatus.BAD_REQUEST, "좋아요/싫어요 값이 올바르지 않습니다."),
+    /** 없는 후기 정렬 slug */
+    RATING_INVALID_SORT(HttpStatus.BAD_REQUEST, "없는 정렬 방식입니다."),
     /** 목록 필터의 대분류와 소분류가 서로 맞지 않는 경우 */
     RATING_CATEGORY_MISMATCH(HttpStatus.BAD_REQUEST, "대분류와 소분류가 맞지 않습니다.");
 
