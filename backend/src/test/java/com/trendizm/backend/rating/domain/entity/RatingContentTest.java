@@ -1,6 +1,7 @@
 package com.trendizm.backend.rating.domain.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.trendizm.backend.rating.domain.enums.RatingContentCategory;
 import com.trendizm.backend.rating.domain.enums.RatingContentStatus;
@@ -65,7 +66,7 @@ class RatingContentTest {
         RatingContent content = RatingContent.create(RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING,
                 "드라마", null, null, null, null, extra);
 
-        extra.put("episodes", 16);
+        extra.put("episodeLength", "60분");
 
         assertThat(content.getExtra()).containsOnlyKeys("season");
     }
@@ -80,6 +81,21 @@ class RatingContentTest {
                 "드라마", null, null, null, null, extra);
 
         assertThat(content.getExtra()).containsEntry("season", null);
+    }
+
+    @Test
+    @DisplayName("추가 정보 키는 소분류마다 정해진 것만 쓸 수 있다")
+    void 추가_정보_키() {
+        RatingContent drama = RatingContent.create(RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING,
+                "드라마", null, null, null, null, Map.of("season", 2, "episodeLength", "60분"));
+        assertThat(drama.getExtra()).containsOnlyKeys("season", "episodeLength");
+
+        assertThatThrownBy(() -> RatingContent.create(RatingContentSubcategory.CAFE, RatingContentStatus.ONGOING,
+                "카페", null, null, null, null, Map.of("season", 2)))
+                .as("카페에는 시즌을 넣을 수 없다").isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> RatingContent.create(RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING,
+                "드라마", null, null, null, null, Map.of("seson", 2)))
+                .as("없는 키").isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

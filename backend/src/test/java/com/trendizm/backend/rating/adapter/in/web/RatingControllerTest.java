@@ -77,4 +77,14 @@ class RatingControllerTest {
         mockMvc.perform(get("/api/ratings").param("size", "101")).andExpect(status().isBadRequest());
         verifyNoInteractions(ratingService);
     }
+
+    @Test
+    @DisplayName("빈 필터 값(?category=)은 보내지 않은 것과 같이 전체로 본다")
+    void 빈_필터() throws Exception {
+        given(ratingService.getContents(new RatingContentQuery(null, null, null, 0, 20)))
+                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+
+        mockMvc.perform(get("/api/ratings").param("category", "").param("subcategory", " ").param("status", ""))
+                .andExpect(status().isOk());
+    }
 }

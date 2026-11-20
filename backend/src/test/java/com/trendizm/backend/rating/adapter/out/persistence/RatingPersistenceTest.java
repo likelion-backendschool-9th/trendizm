@@ -46,7 +46,7 @@ class RatingPersistenceTest {
     void setUp() {
         contentId = contentRepository.save(RatingContent.create(RatingContentSubcategory.DRAMA,
                 RatingContentStatus.ONGOING, "드라마", "설명", "https://img.test/a.jpg", 15,
-                LocalDate.of(2026, 11, 1), Map.of("season", 2, "runtime", "70분"))).getId();
+                LocalDate.of(2026, 11, 1), Map.of("season", 2, "episodeLength", "70분"))).getId();
     }
 
     @Test
@@ -57,7 +57,7 @@ class RatingPersistenceTest {
 
         RatingContent found = contentRepository.findById(contentId).orElseThrow();
 
-        assertThat(found.getExtra()).containsEntry("season", 2).containsEntry("runtime", "70분");
+        assertThat(found.getExtra()).containsEntry("season", 2).containsEntry("episodeLength", "70분");
         assertThat(found.getReleasedAt()).isEqualTo(LocalDate.of(2026, 11, 1));
         assertThat(found.getCreatedAt()).isNotNull();
     }

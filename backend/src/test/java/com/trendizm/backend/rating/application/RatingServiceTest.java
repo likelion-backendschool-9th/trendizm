@@ -42,7 +42,7 @@ class RatingServiceTest {
 
     private Long register(RatingContentSubcategory subcategory, RatingContentStatus status) {
         return ratingService.registerContent(new RegisterRatingContentCommand(subcategory.getSlug(), status.getSlug(), "콘텐츠",
-                "설명", "https://img.test/a.jpg", 15, LocalDate.of(2026, 11, 1), Map.of("season", 2))).id();
+                "설명", "https://img.test/a.jpg", 15, LocalDate.of(2026, 11, 1), null)).id();
     }
 
     private void review(Long contentId, Long userId, Sentiment sentiment, int score) {
@@ -78,6 +78,19 @@ class RatingServiceTest {
         assertError(() -> ratingService.registerContent(new RegisterRatingContentCommand(
                 "drama", "airing", "드라마", null, null, null, null, null)), RatingErrorCode.RATING_INVALID_STATUS);
         assertThat(ratingService.getContents(new RatingContentQuery(null, null, null, 0, 20)).totalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("추가 정보는 소분류에 맞는 키만 받고, 아니면 RATING_INVALID_EXTRA_KEY")
+    void 추가_정보_등록() {
+        RatingContentResponse drama = ratingService.registerContent(new RegisterRatingContentCommand("drama",
+                "ongoing", "드라마", null, null, null, null, Map.of("season", 2, "episodeLength", "60분")));
+        assertThat(drama.extra()).containsEntry("season", 2).containsEntry("episodeLength", "60분");
+
+        assertError(() -> ratingService.registerContent(new RegisterRatingContentCommand("cafe", "ongoing", "카페",
+                null, null, null, null, Map.of("season", 2))), RatingErrorCode.RATING_INVALID_EXTRA_KEY);
+        assertError(() -> ratingService.registerContent(new RegisterRatingContentCommand("drama", "ongoing",
+                "드라마", null, null, null, null, Map.of("runtime", "60분"))), RatingErrorCode.RATING_INVALID_EXTRA_KEY);
     }
 
     @Test

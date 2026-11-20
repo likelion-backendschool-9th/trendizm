@@ -32,7 +32,8 @@ public class RatingController {
     private final RatingService ratingService;
 
     /**
-     * 콘텐츠 목록 (최신 등록순). category·subcategory·status는 slug 값(예: media, drama, ongoing)이고 비우면 전체다.
+     * 콘텐츠 목록 (최신 등록순). category·subcategory·status는 slug 값(예: media, drama, ongoing)이고
+     * 보내지 않거나 빈 값(?category=)이면 전체다.
      * 없는 slug면 RATING_INVALID_CATEGORY·RATING_INVALID_STATUS
      */
     @GetMapping
@@ -44,13 +45,15 @@ public class RatingController {
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
             @Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
-        RatingContentCategory parsedCategory = category == null ? null : RatingContentCategory.fromSlug(category)
-                .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_CATEGORY));
-        RatingContentSubcategory parsedSubcategory = subcategory == null ? null
-                : RatingContentSubcategory.fromSlug(subcategory)
+        RatingContentCategory parsedCategory = isBlank(category) ? null
+                : RatingContentCategory.fromSlug(category.strip())
                         .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_CATEGORY));
-        RatingContentStatus parsedStatus = status == null ? null : RatingContentStatus.fromSlug(status)
-                .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_STATUS));
+        RatingContentSubcategory parsedSubcategory = isBlank(subcategory) ? null
+                : RatingContentSubcategory.fromSlug(subcategory.strip())
+                        .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_CATEGORY));
+        RatingContentStatus parsedStatus = isBlank(status) ? null
+                : RatingContentStatus.fromSlug(status.strip())
+                        .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_STATUS));
         return ratingService.getContents(
                 new RatingContentQuery(parsedCategory, parsedSubcategory, parsedStatus, page, size));
     }
@@ -58,5 +61,10 @@ public class RatingController {
     @GetMapping("/{ratingId}")
     public RatingContentResponse getContent(@PathVariable Long ratingId) {
         return ratingService.getContent(ratingId);
+    }
+
+    /** 화면에서 "전체"를 고르면 ?category= 처럼 빈 값이 올 수 있어서, 보내지 않은 것과 같게 본다 */
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

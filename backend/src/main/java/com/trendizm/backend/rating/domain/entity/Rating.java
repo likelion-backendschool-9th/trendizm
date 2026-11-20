@@ -24,7 +24,8 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "ratings",
         uniqueConstraints = @UniqueConstraint(columnNames = {"content_id", "user_id"}),
-        indexes = @Index(columnList = "content_id, sentiment"))
+        // 호/불호별 목록·개수와 평균 별점을 인덱스만으로 구할 수 있도록 score까지 넣는다
+        indexes = @Index(columnList = "content_id, sentiment, score"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Rating extends BaseTimeEntity {

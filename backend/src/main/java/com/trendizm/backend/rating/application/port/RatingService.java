@@ -20,7 +20,8 @@ public interface RatingService {
 
     /**
      * 관리자 콘텐츠 등록. 관리자 API(POST /api/admin/ratings)에서 호출한다.
-     * 없는 소분류 slug면 RATING_INVALID_CATEGORY, 없는 진행 상태 slug면 RATING_INVALID_STATUS
+     * 없는 소분류 slug면 RATING_INVALID_CATEGORY, 없는 진행 상태 slug면 RATING_INVALID_STATUS,
+     * 추가 정보에 그 소분류에서 쓸 수 없는 키가 있으면 RATING_INVALID_EXTRA_KEY (RatingContentExtraKey 참고)
      */
     RatingContentResponse registerContent(RegisterRatingContentCommand command);
 

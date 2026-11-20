@@ -2,6 +2,7 @@ package com.trendizm.backend.rating.domain.entity;
 
 import com.trendizm.backend.global.entity.BaseCreatedEntity;
 import com.trendizm.backend.rating.domain.enums.RatingContentCategory;
+import com.trendizm.backend.rating.domain.enums.RatingContentExtraKey;
 import com.trendizm.backend.rating.domain.enums.RatingContentStatus;
 import com.trendizm.backend.rating.domain.enums.RatingContentSubcategory;
 import com.trendizm.backend.rating.domain.enums.RatingContentVisibility;
@@ -71,7 +72,7 @@ public class RatingContent extends BaseCreatedEntity {
     /** 공개일 (방영·출시·발매·오픈일) */
     private LocalDate releasedAt;
 
-    /** 소분류별 추가 정보 (예: 시즌, 회당 길이). ERD jsonb */
+    /** 소분류별 추가 정보. 키는 RatingContentExtraKey에 정한 것만 쓸 수 있다. 예: { "season": 2, "episodeLength": "60분" }. ERD jsonb */
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> extra;
 
@@ -79,6 +80,14 @@ public class RatingContent extends BaseCreatedEntity {
                           String description, String imageUrl, Integer ageRating, LocalDate releasedAt,
                           Map<String, Object> extra) {
         this.subcategory = Objects.requireNonNull(subcategory, "subcategory");
+        if (extra != null) {
+            extra.keySet().stream()
+                    .filter(key -> !RatingContentExtraKey.isAllowed(subcategory, key))
+                    .findFirst()
+                    .ifPresent(key -> {
+                        throw new IllegalArgumentException(subcategory + "에 쓸 수 없는 추가 정보 키입니다. key=" + key);
+                    });
+        }
         this.category = subcategory.getCategory();
         this.status = Objects.requireNonNull(status, "status");
         this.visibility = RatingContentVisibility.PUBLIC;
@@ -91,6 +100,7 @@ public class RatingContent extends BaseCreatedEntity {
         this.extra = extra == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(extra));
     }
 
+    /** 추가 정보에 이 소분류에서 쓸 수 없는 키가 있으면 IllegalArgumentException (RatingContentExtraKey 참고) */
     public static RatingContent create(RatingContentSubcategory subcategory, RatingContentStatus status, String title,
                                        String description, String imageUrl, Integer ageRating,
                                        LocalDate releasedAt, Map<String, Object> extra) {
