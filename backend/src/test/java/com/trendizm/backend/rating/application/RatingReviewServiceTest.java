@@ -173,6 +173,82 @@ class RatingReviewServiceTest {
     }
 
     @Test
+    @DisplayName("후기 공감은 한 사람당 한 번이고, 공감 수와 내가 공감했는지를 보여 준다")
+    void 후기_공감() {
+        Long reviewId = save(alice, Sentiment.LIKE, 5).review().id();
+
+        ratingService.likeReview(reviewId, bob);
+        ratingService.likeReview(reviewId, bob);
+        ratingService.likeReview(reviewId, carol);
+
+        RatingReviewResponse seenByBob = ratingService.getReviews(
+                new RatingReviewQuery(contentId, null, null, bob, 0, 20)).content().get(0);
+        assertThat(seenByBob.likeCount()).isEqualTo(2);
+        assertThat(seenByBob.likedByMe()).isTrue();
+
+        RatingReviewResponse seenByGuest = ratingService.getReviews(
+                new RatingReviewQuery(contentId, null, null, null, 0, 20)).content().get(0);
+        assertThat(seenByGuest.likeCount()).isEqualTo(2);
+        assertThat(seenByGuest.likedByMe()).isFalse();
+    }
+
+    @Test
+    @DisplayName("공감을 취소하면 공감 수가 줄고, 공감하지 않은 후기를 취소해도 오류가 나지 않는다")
+    void 후기_공감_취소() {
+        Long reviewId = save(alice, Sentiment.LIKE, 5).review().id();
+        ratingService.likeReview(reviewId, bob);
+
+        ratingService.unlikeReview(reviewId, bob);
+        ratingService.unlikeReview(reviewId, bob);
+
+        RatingReviewResponse review = ratingService.getReviews(
+                new RatingReviewQuery(contentId, null, null, bob, 0, 20)).content().get(0);
+        assertThat(review.likeCount()).isZero();
+        assertThat(review.likedByMe()).isFalse();
+    }
+
+    @Test
+    @DisplayName("공감 많은 순으로 정렬하고, 공감 수가 같으면 최신 후기가 먼저 온다")
+    void 공감순_정렬() {
+        Long aliceReview = save(alice, Sentiment.LIKE, 5).review().id();
+        Long bobReview = save(bob, Sentiment.DISLIKE, 2).review().id();
+        Long carolReview = save(carol, Sentiment.LIKE, 4).review().id();
+        ratingService.likeReview(bobReview, alice);
+        ratingService.likeReview(bobReview, carol);
+        ratingService.likeReview(aliceReview, bob);
+
+        assertThat(reviewIds(null, ReviewSort.LIKES)).containsExactly(bobReview, aliceReview, carolReview);
+        assertThat(reviewIds(Sentiment.LIKE, ReviewSort.LIKES)).containsExactly(aliceReview, carolReview);
+        assertThat(ratingService.getReviews(new RatingReviewQuery(contentId, null, ReviewSort.LIKES, null, 0, 2))
+                .totalElements()).as("페이지 나눔에도 전체 개수는 그대로").isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("없는 후기나 숨긴 콘텐츠의 후기에 공감하면 RATING_REVIEW_NOT_FOUND")
+    void 공감_대상_없음() {
+        Long reviewId = save(alice, Sentiment.LIKE, 5).review().id();
+        ratingService.changeContentVisibility(contentId, false);
+
+        for (Long target : List.of(999_999L, reviewId)) {
+            assertThatThrownBy(() -> ratingService.likeReview(target, bob))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(RatingErrorCode.RATING_REVIEW_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @DisplayName("후기를 수정해도 받은 공감은 그대로 남는다")
+    void 수정_후_공감() {
+        Long reviewId = save(alice, Sentiment.LIKE, 5).review().id();
+        ratingService.likeReview(reviewId, bob);
+
+        RatingReviewSaveResult updated = save(alice, Sentiment.DISLIKE, 1);
+
+        assertThat(updated.review().likeCount()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("후기를 수정하면 응답의 수정 시각이 DB에 저장된 새 수정 시각과 같다")
     void 수정_시각() throws InterruptedException {
         RatingReviewSaveResult created = save(alice, Sentiment.LIKE, 5);

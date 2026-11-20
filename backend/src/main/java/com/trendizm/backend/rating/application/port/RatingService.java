@@ -11,7 +11,7 @@ import com.trendizm.backend.rating.application.dto.RegisterRatingContentCommand;
 import com.trendizm.backend.rating.application.dto.SaveRatingReviewCommand;
 
 /**
- * 호불호 평점 유스케이스 (in 포트). 콘텐츠 등록·숨김·조회와 후기 작성·조회를 다룬다. 후기 공감은 다음 작업에서 추가한다.
+ * 호불호 평점 유스케이스 (in 포트). 콘텐츠 등록·숨김·조회, 후기 작성·조회, 후기 공감을 다룬다.
  * 관리자가 숨긴 콘텐츠(HIDDEN)는 일반 조회에서 없는 콘텐츠로 취급한다(RATING_CONTENT_NOT_FOUND).
  */
 public interface RatingService {
@@ -35,7 +35,7 @@ public interface RatingService {
      */
     void changeContentVisibility(Long contentId, boolean visible);
 
-    /** 공개 콘텐츠의 후기 목록. 호/불호로 거르고 정렬한다 */
+    /** 공개 콘텐츠의 후기 목록. 호/불호로 거르고 정렬한다. 후기마다 공감 수와 보는 사람이 공감했는지를 담는다 */
     PageResponse<RatingReviewResponse> getReviews(RatingReviewQuery query);
 
     /**
@@ -43,4 +43,10 @@ public interface RatingService {
      * 처음 작성할 때만 후기 보상 포인트를 준다. 숨겼거나 없는 콘텐츠면 RATING_CONTENT_NOT_FOUND
      */
     RatingReviewSaveResult saveReview(SaveRatingReviewCommand command);
+
+    /** 후기 공감. 이미 공감했으면 아무것도 하지 않는다. 없거나 숨긴 콘텐츠의 후기면 RATING_REVIEW_NOT_FOUND */
+    void likeReview(Long reviewId, Long userId);
+
+    /** 후기 공감 취소. 공감하지 않았으면 아무것도 하지 않는다 */
+    void unlikeReview(Long reviewId, Long userId);
 }

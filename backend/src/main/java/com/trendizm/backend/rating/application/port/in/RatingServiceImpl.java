@@ -18,6 +18,8 @@ import com.trendizm.backend.point.application.port.PointService;
 import com.trendizm.backend.rating.application.port.RatingService;
 import com.trendizm.backend.rating.application.port.ReviewSort;
 import com.trendizm.backend.rating.application.port.out.RatingContentRepository;
+import com.trendizm.backend.rating.application.port.out.RatingLikeRepository;
+import com.trendizm.backend.rating.application.port.out.ReviewLikeCount;
 import com.trendizm.backend.rating.application.port.out.RatingRepository;
 import com.trendizm.backend.rating.application.port.out.SentimentCount;
 import com.trendizm.backend.rating.domain.entity.Rating;
@@ -58,6 +60,7 @@ public class RatingServiceImpl implements RatingService {
 
     private final RatingContentRepository contentRepository;
     private final RatingRepository ratingRepository;
+    private final RatingLikeRepository likeRepository;
     private final MemberService memberService;
     private final PointService pointService;
 
@@ -103,14 +106,9 @@ public class RatingServiceImpl implements RatingService {
     @Override
     public PageResponse<RatingReviewResponse> getReviews(RatingReviewQuery query) {
         getPublicContent(query.contentId());
-        Pageable pageable = PageRequest.of(query.page(), query.size(), toSort(query.sort()));
-        Page<Rating> reviews = query.sentiment() == null
-                ? ratingRepository.findByContentId(query.contentId(), pageable)
-                : ratingRepository.findByContentIdAndSentiment(query.contentId(), query.sentiment(), pageable);
-        Map<Long, String> authors = nicknames(reviews.map(Rating::getUserId).getContent());
-        return PageResponse.from(reviews, review -> RatingReviewResponse.from(review)
-                .withAuthor(authors.get(review.getUserId()))
-                .withMine(review.getUserId().equals(query.viewerId())));
+        Page<Rating> reviews = findReviews(query);
+        Function<Rating, RatingReviewResponse> toResponse = reviewResponses(reviews.getContent(), query.viewerId());
+        return PageResponse.from(reviews, toResponse);
     }
 
     @Override
@@ -140,10 +138,62 @@ public class RatingServiceImpl implements RatingService {
             pointService.rewardForReview(command.userId(), review.getId(), REVIEW_REWARD_POINT);
             reward = REVIEW_REWARD_POINT;
         }
-        RatingReviewResponse response = RatingReviewResponse.from(review)
-                .withAuthor(nicknames(List.of(command.userId())).get(command.userId()))
-                .withMine(true);
+        RatingReviewResponse response = reviewResponses(List.of(review), command.userId()).apply(review);
         return new RatingReviewSaveResult(response, created, reward);
+    }
+
+    @Override
+    @Transactional
+    public void likeReview(Long reviewId, Long userId) {
+        Rating review = ratingRepository.findById(reviewId)
+                .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_REVIEW_NOT_FOUND));
+        boolean contentPublic = contentRepository.findById(review.getContentId())
+                .map(RatingContent::isPublic)
+                .orElse(false);
+        if (!contentPublic) {
+            throw new BusinessException(RatingErrorCode.RATING_REVIEW_NOT_FOUND);
+        }
+        likeRepository.insertIfAbsent(reviewId, userId);
+    }
+
+    @Override
+    @Transactional
+    public void unlikeReview(Long reviewId, Long userId) {
+        likeRepository.deleteByRatingIdAndUserId(reviewId, userId);
+    }
+
+    private Page<Rating> findReviews(RatingReviewQuery query) {
+        ReviewSort sort = query.sort() == null ? ReviewSort.LATEST : query.sort();
+        if (sort == ReviewSort.LIKES) {
+            // 공감 수 정렬은 쿼리 안에서 하므로 pageable에는 정렬을 넣지 않는다
+            Pageable pageable = PageRequest.of(query.page(), query.size());
+            return query.sentiment() == null
+                    ? ratingRepository.findByContentIdOrderByLikes(query.contentId(), pageable)
+                    : ratingRepository.findByContentIdAndSentimentOrderByLikes(
+                            query.contentId(), query.sentiment(), pageable);
+        }
+        Pageable pageable = PageRequest.of(query.page(), query.size(), toSort(sort));
+        return query.sentiment() == null
+                ? ratingRepository.findByContentId(query.contentId(), pageable)
+                : ratingRepository.findByContentIdAndSentiment(query.contentId(), query.sentiment(), pageable);
+    }
+
+    /** 후기들을 응답으로 바꾸는 함수. 작성자 닉네임·공감 수·보는 사람이 공감했는지를 한 번에 조회해 둔다 */
+    private Function<Rating, RatingReviewResponse> reviewResponses(List<Rating> reviews, Long viewerId) {
+        if (reviews.isEmpty()) {
+            return RatingReviewResponse::from;
+        }
+        List<Long> reviewIds = reviews.stream().map(Rating::getId).toList();
+        Map<Long, String> authors = nicknames(reviews.stream().map(Rating::getUserId).toList());
+        Map<Long, Long> likeCounts = likeRepository.countGroupByRatingId(reviewIds).stream()
+                .collect(Collectors.toMap(ReviewLikeCount::ratingId, ReviewLikeCount::count));
+        Set<Long> likedByViewer = viewerId == null
+                ? Set.of()
+                : new HashSet<>(likeRepository.findLikedRatingIds(viewerId, reviewIds));
+        return review -> RatingReviewResponse.from(review)
+                .withAuthor(authors.get(review.getUserId()))
+                .withMine(review.getUserId().equals(viewerId))
+                .withLikes(likeCounts.getOrDefault(review.getId(), 0L), likedByViewer.contains(review.getId()));
     }
 
     private RatingContent getPublicContent(Long contentId) {
@@ -154,10 +204,11 @@ public class RatingServiceImpl implements RatingService {
 
     private static Sort toSort(ReviewSort sort) {
         Sort latest = Sort.by(Sort.Direction.DESC, "id");
-        return switch (sort == null ? ReviewSort.LATEST : sort) {
+        return switch (sort) {
             case LATEST -> latest;
             case SCORE_HIGH -> Sort.by(Sort.Direction.DESC, "score").and(latest);
             case SCORE_LOW -> Sort.by(Sort.Direction.ASC, "score").and(latest);
+            case LIKES -> throw new IllegalArgumentException("LIKES는 공감 수 정렬 쿼리로 조회한다");
         };
     }
 

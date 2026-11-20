@@ -23,17 +23,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 호불호 평점 API. 경로의 ratingId는 콘텐츠(rating_contents) id다.
- * 조회(GET)는 로그인 없이, 후기 작성(POST)은 로그인이 필요하다 (auth/adapter/out/security/SecurityConfig).
+ * 조회(GET)는 로그인 없이, 후기 작성·공감(POST·DELETE)은 로그인이 필요하다 (auth/adapter/out/security/SecurityConfig).
  * 콘텐츠 등록·숨김은 관리자 API(/api/admin/ratings)에서 RatingService를 호출한다.
  */
 @RestController
@@ -82,7 +84,8 @@ public class RatingController {
     }
 
     /**
-     * 후기 목록. sentiment(like·dislike)는 보내지 않거나 빈 값이면 전체, sort는 latest(기본)·score-high·score-low.
+     * 후기 목록. sentiment(like·dislike)는 보내지 않거나 빈 값이면 전체,
+     * sort는 latest(기본)·score-high·score-low·likes(공감 많은 순).
      * 없는 값이면 RATING_INVALID_SENTIMENT·RATING_INVALID_SORT
      */
     @GetMapping("/{ratingId}/reviews")
@@ -114,6 +117,18 @@ public class RatingController {
             @Valid @RequestBody SaveRatingReviewRequest request) {
         RatingReviewSaveResult result = ratingService.saveReview(request.toCommand(ratingId, userId));
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result);
+    }
+
+    @PostMapping("/reviews/{reviewId}/likes")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void likeReview(@PathVariable Long reviewId, @AuthenticationPrincipal(expression = "id") Long userId) {
+        ratingService.likeReview(reviewId, userId);
+    }
+
+    @DeleteMapping("/reviews/{reviewId}/likes")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unlikeReview(@PathVariable Long reviewId, @AuthenticationPrincipal(expression = "id") Long userId) {
+        ratingService.unlikeReview(reviewId, userId);
     }
 
     /** 화면에서 "전체"를 고르면 ?category= 처럼 빈 값이 올 수 있어서, 보내지 않은 것과 같게 본다 */

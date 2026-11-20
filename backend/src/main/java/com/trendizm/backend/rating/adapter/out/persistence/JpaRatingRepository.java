@@ -3,8 +3,11 @@ package com.trendizm.backend.rating.adapter.out.persistence;
 import com.trendizm.backend.rating.application.port.out.RatingRepository;
 import com.trendizm.backend.rating.application.port.out.SentimentCount;
 import com.trendizm.backend.rating.domain.entity.Rating;
+import com.trendizm.backend.rating.domain.enums.Sentiment;
 import java.util.Collection;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -38,4 +41,23 @@ public interface JpaRatingRepository extends JpaRepository<Rating, Long>, Rating
             group by r.contentId, r.sentiment
             """)
     List<SentimentCount> countGroupByContentIdAndSentiment(@Param("contentIds") Collection<Long> contentIds);
+
+    @Override
+    @Query(value = """
+            select r from Rating r
+            where r.contentId = :contentId
+            order by (select count(l) from RatingLike l where l.ratingId = r.id) desc, r.id desc
+            """,
+            countQuery = "select count(r) from Rating r where r.contentId = :contentId")
+    Page<Rating> findByContentIdOrderByLikes(@Param("contentId") Long contentId, Pageable pageable);
+
+    @Override
+    @Query(value = """
+            select r from Rating r
+            where r.contentId = :contentId and r.sentiment = :sentiment
+            order by (select count(l) from RatingLike l where l.ratingId = r.id) desc, r.id desc
+            """,
+            countQuery = "select count(r) from Rating r where r.contentId = :contentId and r.sentiment = :sentiment")
+    Page<Rating> findByContentIdAndSentimentOrderByLikes(@Param("contentId") Long contentId,
+                                                         @Param("sentiment") Sentiment sentiment, Pageable pageable);
 }

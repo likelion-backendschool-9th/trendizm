@@ -15,7 +15,9 @@ public enum ReviewSort {
     /** 별점 높은 순 */
     SCORE_HIGH,
     /** 별점 낮은 순 */
-    SCORE_LOW;
+    SCORE_LOW,
+    /** 공감 많은 순 */
+    LIKES;
 
     /** 예: SCORE_HIGH → score-high */
     public String getSlug() {

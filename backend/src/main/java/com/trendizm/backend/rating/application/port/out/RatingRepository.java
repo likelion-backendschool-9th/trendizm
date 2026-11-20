@@ -35,6 +35,12 @@ public interface RatingRepository {
 
     Page<Rating> findByContentIdAndSentiment(Long contentId, Sentiment sentiment, Pageable pageable);
 
+    /** 공감 많은 순 (같으면 최신순). pageable의 정렬은 쓰지 않는다 */
+    Page<Rating> findByContentIdOrderByLikes(Long contentId, Pageable pageable);
+
+    /** 호/불호로 거른 공감 많은 순 (같으면 최신순). pageable의 정렬은 쓰지 않는다 */
+    Page<Rating> findByContentIdAndSentimentOrderByLikes(Long contentId, Sentiment sentiment, Pageable pageable);
+
     /** 콘텐츠·호불호별 후기 수와 평균 별점. 후기가 없는 조합은 결과에 없다 */
     List<SentimentCount> countGroupByContentIdAndSentiment(Collection<Long> contentIds);
 }
