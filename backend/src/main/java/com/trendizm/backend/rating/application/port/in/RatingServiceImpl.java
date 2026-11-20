@@ -13,6 +13,8 @@ import com.trendizm.backend.rating.application.port.out.RatingContentRepository;
 import com.trendizm.backend.rating.application.port.out.RatingRepository;
 import com.trendizm.backend.rating.application.port.out.SentimentCount;
 import com.trendizm.backend.rating.domain.entity.RatingContent;
+import com.trendizm.backend.rating.domain.enums.RatingContentStatus;
+import com.trendizm.backend.rating.domain.enums.RatingContentSubcategory;
 import com.trendizm.backend.rating.domain.enums.RatingContentVisibility;
 import com.trendizm.backend.rating.domain.enums.Sentiment;
 import java.util.Collection;
@@ -57,7 +59,11 @@ public class RatingServiceImpl implements RatingService {
     @Override
     @Transactional
     public RatingContentResponse registerContent(RegisterRatingContentCommand command) {
-        RatingContent content = contentRepository.save(RatingContent.create(command.subcategory(), command.status(),
+        RatingContentSubcategory subcategory = RatingContentSubcategory.fromSlug(command.subcategory())
+                .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_CATEGORY));
+        RatingContentStatus status = RatingContentStatus.fromSlug(command.status())
+                .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_STATUS));
+        RatingContent content = contentRepository.save(RatingContent.create(subcategory, status,
                 command.title(), command.description(), command.imageUrl(), command.ageRating(),
                 command.releasedAt(), command.extra()));
         return toResponse(content);

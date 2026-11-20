@@ -41,7 +41,7 @@ class RatingServiceTest {
     private RatingRepository ratingRepository;
 
     private Long register(RatingContentSubcategory subcategory, RatingContentStatus status) {
-        return ratingService.registerContent(new RegisterRatingContentCommand(subcategory, status, "콘텐츠",
+        return ratingService.registerContent(new RegisterRatingContentCommand(subcategory.getSlug(), status.getSlug(), "콘텐츠",
                 "설명", "https://img.test/a.jpg", 15, LocalDate.of(2026, 11, 1), Map.of("season", 2))).id();
     }
 
@@ -57,10 +57,10 @@ class RatingServiceTest {
     }
 
     @Test
-    @DisplayName("콘텐츠를 등록하면 소분류로 대분류가 정해지고, 진행 상태 이름은 대분류에 맞게 나온다")
+    @DisplayName("콘텐츠를 slug로 등록하면 소분류로 대분류가 정해지고, 진행 상태 이름은 대분류에 맞게 나온다")
     void 콘텐츠_등록() {
         RatingContentResponse created = ratingService.registerContent(new RegisterRatingContentCommand(
-                RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING, "드라마", null, null, null, null, null));
+                "drama", "ongoing", "드라마", null, null, null, null, null));
 
         assertThat(created.category().slug()).isEqualTo("media");
         assertThat(created.subcategory().slug()).isEqualTo("drama");
@@ -68,6 +68,16 @@ class RatingServiceTest {
         assertThat(created.status().label()).isEqualTo("방영중");
         assertThat(created.extra()).isEmpty();
         assertThat(created.stats()).isEqualTo(SentimentStats.EMPTY);
+    }
+
+    @Test
+    @DisplayName("없는 소분류·진행 상태 slug로 등록하면 RATING_INVALID_CATEGORY·RATING_INVALID_STATUS")
+    void 잘못된_등록() {
+        assertError(() -> ratingService.registerContent(new RegisterRatingContentCommand(
+                "DRAMA", "ongoing", "드라마", null, null, null, null, null)), RatingErrorCode.RATING_INVALID_CATEGORY);
+        assertError(() -> ratingService.registerContent(new RegisterRatingContentCommand(
+                "drama", "airing", "드라마", null, null, null, null, null)), RatingErrorCode.RATING_INVALID_STATUS);
+        assertThat(ratingService.getContents(new RatingContentQuery(null, null, null, 0, 20)).totalElements()).isZero();
     }
 
     @Test

@@ -18,7 +18,10 @@ public interface RatingService {
     /** 공개 콘텐츠 상세. 호/불호 수·비율과 각각의 평균 별점을 담는다 */
     RatingContentResponse getContent(Long contentId);
 
-    /** 관리자 콘텐츠 등록. 관리자 API(POST /api/admin/ratings)에서 호출한다 */
+    /**
+     * 관리자 콘텐츠 등록. 관리자 API(POST /api/admin/ratings)에서 호출한다.
+     * 없는 소분류 slug면 RATING_INVALID_CATEGORY, 없는 진행 상태 slug면 RATING_INVALID_STATUS
+     */
     RatingContentResponse registerContent(RegisterRatingContentCommand command);
 
     /**
