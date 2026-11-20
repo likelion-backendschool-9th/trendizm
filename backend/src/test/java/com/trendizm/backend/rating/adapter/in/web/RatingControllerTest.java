@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -178,5 +179,34 @@ class RatingControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("RATING_INVALID_SENTIMENT"));
         verifyNoInteractions(ratingService);
+    }
+
+    @Test
+    @DisplayName("후기 공감·취소는 204이고 로그인한 회원 id를 넘긴다")
+    void 후기_공감() throws Exception {
+        mockMvc.perform(post("/api/ratings/reviews/3/likes").with(user(LOGIN_USER))).andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/ratings/reviews/3/likes").with(user(LOGIN_USER))).andExpect(status().isNoContent());
+
+        verify(ratingService).likeReview(3L, 7L);
+        verify(ratingService).unlikeReview(3L, 7L);
+    }
+
+    @Test
+    @DisplayName("로그인하지 않으면 후기에 공감할 수 없다")
+    void 비로그인_공감() throws Exception {
+        mockMvc.perform(post("/api/ratings/reviews/3/likes")).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete("/api/ratings/reviews/3/likes")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(ratingService);
+    }
+
+    @Test
+    @DisplayName("공감 많은 순 정렬 값을 받는다")
+    void 공감순_정렬() throws Exception {
+        given(ratingService.getReviews(new RatingReviewQuery(1L, null, ReviewSort.LIKES, null, 0, 20)))
+                .willReturn(new PageResponse<>(List.of(review()), 0, 20, 1, 1, false));
+
+        mockMvc.perform(get("/api/ratings/1/reviews").param("sort", "likes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].likeCount").value(0));
     }
 }

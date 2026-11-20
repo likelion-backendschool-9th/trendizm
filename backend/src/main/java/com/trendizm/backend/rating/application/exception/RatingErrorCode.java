@@ -8,6 +8,8 @@ public enum RatingErrorCode implements ErrorCode {
 
     /** 없거나 관리자가 숨긴 콘텐츠 */
     RATING_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "콘텐츠를 찾을 수 없습니다."),
+    /** 없거나 숨긴 콘텐츠의 후기 */
+    RATING_REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "후기를 찾을 수 없습니다."),
     /** 없는 카테고리 slug */
     RATING_INVALID_CATEGORY(HttpStatus.BAD_REQUEST, "없는 카테고리입니다."),
     /** 없는 진행 상태 slug */
