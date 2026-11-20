@@ -16,6 +16,9 @@ public interface MemeRepository {
 
     Optional<Meme> findById(Long id);
 
+    /** 상태와 관계없이 찾는다. 문서를 만들기 전 중복 확인용(숨김 문서도 같은 단어로 본다). word는 Meme.normalizeWord로 바꿔서 넘긴다 */
+    Optional<Meme> findByWord(String word);
+
     /** word는 Meme.normalizeWord로 바꿔서 넘긴다 */
     Optional<Meme> findByWordAndStatus(String word, MemeStatus status);
 

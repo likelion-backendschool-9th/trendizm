@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * memes 테이블. 단어 하나당 문서 하나다(word UNIQUE).
- * 문서는 그 단어에 첫 의견을 쓸 때 함께 만들어진다(의견 작성 기능에서 호출).
+ * 문서는 그 단어에 첫 의견을 쓸 때 함께 만들어진다(MemeInterpretationServiceImpl).
  * 출처는 대표 출처 하나만 둔다(source_url, title, thumbnail_url). 없을 수 있다.
  * 작성자는 다른 도메인(member) 엔티티를 참조하지 않고 id만 저장한다.
  */

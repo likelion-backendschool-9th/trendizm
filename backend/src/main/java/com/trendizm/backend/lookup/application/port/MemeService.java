@@ -5,7 +5,7 @@ import com.trendizm.backend.lookup.application.dto.MemeResponse;
 
 /**
  * 밈 문서 조회. 숨김 문서는 어디에서도 보이지 않는다.
- * 문서 생성은 첫 의견 작성 때 함께 하므로 의견 작성 기능에서 추가한다.
+ * 문서 생성은 첫 의견 작성 때 함께 한다(MemeInterpretationService.createInterpretation).
  */
 public interface MemeService {
 
