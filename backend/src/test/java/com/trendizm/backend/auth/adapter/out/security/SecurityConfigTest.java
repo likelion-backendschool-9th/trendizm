@@ -2,6 +2,7 @@ package com.trendizm.backend.auth.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 
 import com.trendizm.backend.auth.application.port.AuthService;
 import com.trendizm.backend.feed.application.port.FeedService;
@@ -11,6 +12,7 @@ import com.trendizm.backend.notification.application.port.NotificationService;
 import com.trendizm.backend.point.application.port.PointService;
 import com.trendizm.backend.ranking.application.port.RankingService;
 import com.trendizm.backend.rating.application.port.RatingService;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -19,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
@@ -27,6 +31,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 /**
  * 루트 AGENTS.md "로그인 없이 허용할 경로는 SecurityConfig의 permitAll 목록에 추가한다"를 검사한다.
  * 새 컨트롤러를 만들면 ACCESS에 공개 여부를 추가해야 테스트가 통과한다.
+ * ACCESS의 true는 "조회(GET)만 공개"라는 뜻이다. 쓰기 요청은 /api/auth를 빼고 모두 로그인을 요구한다.
  */
 @WebMvcTest
 @Import(SecurityConfig.class)
@@ -43,6 +48,12 @@ class SecurityConfigTest {
             "/api/ratings", true,
             "/api/notifications", false,
             "/api/points", false);
+
+    /** 가입·로그인·재발급은 로그인 전에 POST로 부르므로 쓰기 검사에서 뺀다 */
+    private static final String AUTH = "/api/auth";
+
+    private static final List<HttpMethod> WRITE_METHODS =
+            List.of(HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE);
 
     @Autowired
     private MockMvc mockMvc;
@@ -90,6 +101,26 @@ class SecurityConfigTest {
                 assertThat(rejected).as("%s는 로그인 없이 허용해야 하는데 %d 응답", path, status).isFalse();
             } else {
                 assertThat(rejected).as("%s는 로그인을 요구해야 하는데 %d 응답", path, status).isTrue();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("공개 경로도 쓰기(POST·PUT·PATCH·DELETE)는 로그인을 요구한다")
+    void 공개_경로의_쓰기는_로그인을_요구한다() throws Exception {
+        for (String base : ACCESS.keySet()) {
+            if (base.equals(AUTH)) {
+                continue;
+            }
+            for (String path : List.of(base, base + "/1")) {
+                for (HttpMethod method : WRITE_METHODS) {
+                    int status = mockMvc.perform(request(method, path)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{}"))
+                            .andReturn().getResponse().getStatus();
+                    assertThat(status).as("%s %s는 로그인 없이 막혀야 하는데 %d 응답", method, path, status)
+                            .isEqualTo(401);
+                }
             }
         }
     }
