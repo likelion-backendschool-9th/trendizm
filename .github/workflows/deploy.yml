@@ -1,0 +1,105 @@
+# develop에 push되면 이미지를 빌드해 GHCR에 올리고, 뉴렉처 서버에 SSH로 접속해 새 이미지로 다시 띄운다.
+#
+# 쓰는 Action은 checkout 하나뿐이다. 빌드·push는 docker 명령, 서버 접속은 ssh 명령으로 직접 한다.
+# 서버의 GHCR 로그인은 이 실행에서만 유효한 GITHUB_TOKEN으로 하고, pull 후 바로 로그아웃한다(서버에 토큰을 남기지 않는다).
+#
+# 필요한 Secrets: 저장소 Secrets가 아니라 "production" Environment의 Secrets에 넣는다.
+#   Environment는 develop 브랜치에서만 쓸 수 있게 막아 둔다. 저장소 Secrets에 두면 아무 브랜치의
+#   워크플로나 읽을 수 있어서, 서버 접속 키가 기능 브랜치에서 새어 나갈 수 있다.
+#   DEPLOY_SSH_KEY      배포 전용 SSH 개인키 (서버 trendizm 계정의 authorized_keys에 공개키 등록)
+#   DEPLOY_KNOWN_HOSTS  서버 호스트 키 (서버의 /etc/ssh/ssh_host_ed25519_key.pub로 만든 한 줄) — 가짜 서버 접속 방지
+# 서버 준비 방법은 docs/deploy.md 참고
+
+name: Deploy
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+# 배포가 겹치면 먼저 시작한 것이 끝난 뒤에 실행한다
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_PREFIX: ghcr.io/likelion-backendschool-9th/trendizm
+  DEPLOY_HOST: cloud.newlecture.com
+  DEPLOY_USER: trendizm
+  DEPLOY_DIR: trendizm
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # 테스트가 실패하면 이미지를 만들지 않고 배포도 하지 않는다.
+      # setup-java 대신 백엔드 Dockerfile과 같은 고정 JDK 이미지에서 돌린다 (Java4Shell 플래그 포함)
+      - name: 백엔드 테스트
+        run: |
+          docker run --rm -v "$PWD/backend:/app" -w /app \
+            -e JAVA_TOOL_OPTIONS=-XX:-UseBASE64Intrinsics \
+            eclipse-temurin:21.0.13_9-jdk-alpine@sha256:82801f9dcdcbad5a05082aba8c86d1da5b72ccb498e71318b1f91b5a477887b3 \
+            ./gradlew --no-daemon -Dorg.gradle.java.installations.auto-detect=false test
+
+      - name: GHCR 로그인
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: 백엔드 이미지 빌드·push
+        run: |
+          docker build -t "$IMAGE_PREFIX-backend:$GITHUB_SHA" -t "$IMAGE_PREFIX-backend:develop" backend
+          docker push "$IMAGE_PREFIX-backend:$GITHUB_SHA"
+          docker push "$IMAGE_PREFIX-backend:develop"
+
+      - name: 프론트 이미지 빌드·push
+        run: |
+          docker build -t "$IMAGE_PREFIX-frontend:$GITHUB_SHA" -t "$IMAGE_PREFIX-frontend:develop" frontend
+          docker push "$IMAGE_PREFIX-frontend:$GITHUB_SHA"
+          docker push "$IMAGE_PREFIX-frontend:develop"
+
+      - name: SSH 준비
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host deploy\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' \
+            "$DEPLOY_HOST" "$DEPLOY_USER" > ~/.ssh/config
+
+      - name: compose 파일 전송
+        run: scp compose.prod.yaml "deploy:$DEPLOY_DIR/compose.prod.yaml"
+
+      - name: 서버에서 새 이미지로 실행
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GITHUB_TOKEN" | ssh deploy "
+            set -eu
+            cd '$DEPLOY_DIR'
+            docker login ghcr.io -u '$GITHUB_ACTOR' --password-stdin
+            trap 'docker logout ghcr.io' EXIT
+            export IMAGE_TAG='$GITHUB_SHA'
+            docker compose -f compose.prod.yaml pull
+            docker compose -f compose.prod.yaml up -d --remove-orphans
+            # 공용 서버라 docker image prune(전체 삭제)은 쓰지 않는다. 우리 이미지 중 이번 버전이 아닌 것만 지운다
+            docker image ls --filter 'reference=$IMAGE_PREFIX-*' --format '{{.Repository}}:{{.Tag}}' \\
+              | grep -v -e ':$GITHUB_SHA\$' -e ':develop\$' | xargs -r docker rmi || true
+          "
+
+      - name: SSH 키 삭제
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

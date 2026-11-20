@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // 배포 이미지(frontend/Dockerfile)에 실행에 필요한 파일만 담는다
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
