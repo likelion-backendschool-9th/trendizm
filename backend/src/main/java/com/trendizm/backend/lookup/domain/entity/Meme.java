@@ -66,8 +66,10 @@ public class Meme extends BaseCreatedEntity {
     }
 
     /**
-     * 단어 비교용 표준 형태: 앞뒤 공백 제거.
-     * 대소문자·띄어쓰기 차이까지 같은 단어로 볼지는 아직 정하지 않았다. 단어로 조회할 때도 이 값으로 찾는다.
+     * 단어 저장·조회용 형태: 앞뒤 공백만 지운다.
+     * - 대소문자: 입력한 대로 저장하고(화면에 TMI 그대로), 조회할 때만 무시한다(MemeRepository의 IgnoreCase 메서드).
+     *   word UNIQUE는 대소문자를 구분하므로, 문서를 만들 때(첫 의견 작성) 대소문자를 무시하고 먼저 찾아 중복을 막는다.
+     * - 띄어쓰기: 다른 단어로 본다("알잘딱 깔센"과 "알잘딱깔센"은 다른 문서).
      */
     public static String normalizeWord(String word) {
         return word.strip();

@@ -31,13 +31,13 @@ public class MemeServiceImpl implements MemeService {
         Pageable pageable = PageRequest.of(page, size, LATEST_FIRST);
         Page<Meme> memes = (keyword == null || keyword.isBlank())
                 ? memeRepository.findByStatus(MemeStatus.PUBLIC, pageable)
-                : memeRepository.findByStatusAndWordContaining(MemeStatus.PUBLIC, keyword.strip(), pageable);
+                : memeRepository.findByStatusAndWordContainingIgnoreCase(MemeStatus.PUBLIC, keyword.strip(), pageable);
         return PageResponse.from(memes, MemeResponse::from);
     }
 
     @Override
     public MemeResponse getMeme(String word) {
-        return memeRepository.findByWordAndStatus(Meme.normalizeWord(word), MemeStatus.PUBLIC)
+        return memeRepository.findByWordIgnoreCaseAndStatus(Meme.normalizeWord(word), MemeStatus.PUBLIC)
                 .map(MemeResponse::from)
                 .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
     }

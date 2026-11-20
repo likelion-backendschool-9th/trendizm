@@ -16,9 +16,11 @@ public interface MemeRepository {
 
     Optional<Meme> findById(Long id);
 
-    Optional<Meme> findByWordAndStatus(String word, MemeStatus status);
+    /** 대소문자를 무시하고 찾는다(TMI와 tmi는 같은 문서) */
+    Optional<Meme> findByWordIgnoreCaseAndStatus(String word, MemeStatus status);
 
     Page<Meme> findByStatus(MemeStatus status, Pageable pageable);
 
-    Page<Meme> findByStatusAndWordContaining(MemeStatus status, String keyword, Pageable pageable);
+    /** 대소문자를 무시하고 단어에 keyword가 들어간 문서를 찾는다 */
+    Page<Meme> findByStatusAndWordContainingIgnoreCase(MemeStatus status, String keyword, Pageable pageable);
 }

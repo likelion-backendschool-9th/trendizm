@@ -27,9 +27,10 @@ class MemeServiceTest {
     @Autowired
     private MemeRepository memeRepository;
 
-    /** 공개 문서 3개(저장 순서대로 알잘딱깔센, 중꺾마, 알빠노), 숨김 문서 1개. 테스트가 끝나면 롤백된다 */
+    /** 공개 문서 4개(저장 순서대로 TMI, 알잘딱깔센, 중꺾마, 알빠노), 숨김 문서 1개. 테스트가 끝나면 롤백된다 */
     @BeforeEach
     void setUp() {
+        memeRepository.save(Meme.create("TMI", 1L, null, null, null));
         memeRepository.save(Meme.create("알잘딱깔센", 1L, "https://video.example.com/watch/01", "영상 제목", null));
         memeRepository.save(Meme.create("중꺾마", 1L, null, null, null));
         memeRepository.save(Meme.create("알빠노", 2L, null, null, null));
@@ -47,6 +48,23 @@ class MemeServiceTest {
         assertThat(meme.sourceUrl()).isEqualTo("https://video.example.com/watch/01");
         assertThat(meme.title()).isEqualTo("영상 제목");
         assertThat(meme.createdAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("대소문자는 무시하고 찾고, 저장한 표기 그대로 보여 준다")
+    void 대소문자_무시() {
+        MemeResponse meme = memeService.getMeme("tmi");
+
+        assertThat(meme.word()).isEqualTo("TMI");
+    }
+
+    @Test
+    @DisplayName("띄어쓰기가 다르면 다른 단어다")
+    void 띄어쓰기_구분() {
+        assertThatThrownBy(() -> memeService.getMeme("알잘딱 깔센"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(MemeErrorCode.MEME_NOT_FOUND);
     }
 
     @Test
@@ -73,8 +91,8 @@ class MemeServiceTest {
         PageResponse<MemeResponse> page = memeService.getMemes(null, 0, 20);
 
         assertThat(page.content()).extracting(MemeResponse::word)
-                .containsExactly("알빠노", "중꺾마", "알잘딱깔센");
-        assertThat(page.totalElements()).isEqualTo(3);
+                .containsExactly("알빠노", "중꺾마", "알잘딱깔센", "TMI");
+        assertThat(page.totalElements()).isEqualTo(4);
     }
 
     @Test
@@ -87,11 +105,19 @@ class MemeServiceTest {
     }
 
     @Test
+    @DisplayName("검색도 대소문자를 무시한다")
+    void 검색_대소문자_무시() {
+        PageResponse<MemeResponse> page = memeService.getMemes("tm", 0, 20);
+
+        assertThat(page.content()).extracting(MemeResponse::word).containsExactly("TMI");
+    }
+
+    @Test
     @DisplayName("페이지 크기만큼 나눠서 보여 준다")
     void 페이지() {
-        PageResponse<MemeResponse> page = memeService.getMemes("", 1, 2);
+        PageResponse<MemeResponse> page = memeService.getMemes("", 1, 3);
 
-        assertThat(page.content()).extracting(MemeResponse::word).containsExactly("알잘딱깔센");
+        assertThat(page.content()).extracting(MemeResponse::word).containsExactly("TMI");
         assertThat(page.page()).isEqualTo(1);
         assertThat(page.hasNext()).isFalse();
     }

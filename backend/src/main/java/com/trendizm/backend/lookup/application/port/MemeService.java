@@ -10,11 +10,11 @@ import com.trendizm.backend.lookup.application.dto.MemeResponse;
 public interface MemeService {
 
     /**
-     * 공개 문서 목록 (최근 등록순). keyword가 비어 있지 않으면 단어에 keyword가 들어간 문서만.
+     * 공개 문서 목록 (최근 등록순). keyword가 비어 있지 않으면 단어에 keyword가 들어간 문서만(대소문자 무시).
      * page는 0부터 시작한다.
      */
     PageResponse<MemeResponse> getMemes(String keyword, int page, int size);
 
-    /** 단어로 공개 문서 하나를 찾는다. 없거나 숨김이면 MEME_NOT_FOUND */
+    /** 단어로 공개 문서 하나를 찾는다(대소문자 무시, 띄어쓰기는 구분). 없거나 숨김이면 MEME_NOT_FOUND */
     MemeResponse getMeme(String word);
 }
