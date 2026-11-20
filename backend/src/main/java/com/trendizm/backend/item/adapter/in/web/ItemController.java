@@ -1,5 +1,6 @@
 package com.trendizm.backend.item.adapter.in.web;
 
+import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.item.adapter.in.web.dto.CreateItemCommentRequest;
 import com.trendizm.backend.item.adapter.in.web.dto.CreateItemQuestionRequest;
@@ -9,6 +10,7 @@ import com.trendizm.backend.item.application.dto.ItemQuestionQuery;
 import com.trendizm.backend.item.application.dto.ItemQuestionResponse;
 import com.trendizm.backend.item.application.dto.ItemQuestionSummaryResponse;
 import com.trendizm.backend.item.application.dto.ItemResponse;
+import com.trendizm.backend.item.application.exception.ItemErrorCode;
 import com.trendizm.backend.item.application.port.ItemService;
 import com.trendizm.backend.item.domain.enums.ItemCategory;
 import com.trendizm.backend.item.domain.enums.ItemSubcategory;
@@ -46,16 +48,23 @@ public class ItemController {
 
     private final ItemService itemService;
 
-    /** 질문 글 목록 (최신순). category·subcategory는 code 값(예: FASHION, CLOTHING)이고 비우면 전체다 */
+    /**
+     * 질문 글 목록 (최신순). category·subcategory는 slug 값(예: fashion, eyewear-accessories)이고 비우면 전체다.
+     * 없는 slug면 ITEM_INVALID_CATEGORY
+     */
     @GetMapping
     public PageResponse<ItemQuestionSummaryResponse> getQuestions(
-            @RequestParam(required = false) ItemCategory category,
-            @RequestParam(required = false) ItemSubcategory subcategory,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String subcategory,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
             @Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
-        return itemService.getQuestions(new ItemQuestionQuery(category, subcategory, page, size));
+        ItemCategory parsedCategory = category == null ? null : ItemCategory.fromSlug(category)
+                .orElseThrow(() -> new BusinessException(ItemErrorCode.ITEM_INVALID_CATEGORY));
+        ItemSubcategory parsedSubcategory = subcategory == null ? null : ItemSubcategory.fromSlug(subcategory)
+                .orElseThrow(() -> new BusinessException(ItemErrorCode.ITEM_INVALID_CATEGORY));
+        return itemService.getQuestions(new ItemQuestionQuery(parsedCategory, parsedSubcategory, page, size));
     }
 
     @GetMapping("/{itemId}")
@@ -79,7 +88,7 @@ public class ItemController {
             @PathVariable Long itemId,
             @AuthenticationPrincipal(expression = OPTIONAL_USER_ID) Long viewerId,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
-            @RequestParam(defaultValue = "20")
+            @RequestParam(defaultValue = "10")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
             @Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
         return itemService.getComments(itemId, viewerId, page, size);

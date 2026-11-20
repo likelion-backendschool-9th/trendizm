@@ -10,6 +10,7 @@ import java.util.List;
 /**
  * 추천 아이템 등록. title·description만 필수다.
  * imageUrl·linkUrl은 화면에서 링크·이미지로 쓰므로 http(s) 주소만 받는다 (javascript: 같은 주소로 스크립트가 실행되지 않게).
+ * 비어 있거나 공백만 있으면 없는 것으로 보고, http·https는 대소문자를 구분하지 않는다 (예: Https://).
  */
 public record CreateItemRequest(
         @NotBlank(message = "아이템 이름을 입력해 주세요.")
@@ -30,13 +31,16 @@ public record CreateItemRequest(
         String description,
 
         @Size(max = 500, message = "이미지 주소는 500자 이하여야 합니다.")
-        @Pattern(regexp = "^https?://\\S+$", message = "이미지 주소는 http(s)로 시작해야 합니다.")
+        @Pattern(regexp = URL_OR_BLANK, flags = Pattern.Flag.CASE_INSENSITIVE, message = "이미지 주소는 http(s)로 시작해야 합니다.")
         String imageUrl,
 
         @Size(max = 500, message = "링크는 500자 이하여야 합니다.")
-        @Pattern(regexp = "^https?://\\S+$", message = "링크는 http(s)로 시작해야 합니다.")
+        @Pattern(regexp = URL_OR_BLANK, flags = Pattern.Flag.CASE_INSENSITIVE, message = "링크는 http(s)로 시작해야 합니다.")
         String linkUrl
 ) {
+
+    /** 비어 있거나 공백만 있는 값, 또는 공백 없는 http(s) 주소 */
+    static final String URL_OR_BLANK = "^\\s*$|^https?://\\S+$";
 
     public CreateItemCommand toCommand(Long questionId, Long userId) {
         return new CreateItemCommand(questionId, userId, title.strip(), blankToNull(seller), price,

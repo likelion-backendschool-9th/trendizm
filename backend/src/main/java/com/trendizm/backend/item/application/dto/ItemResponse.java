@@ -6,8 +6,8 @@ import java.util.List;
 
 /**
  * 추천 아이템 하나.
- * 잠겨 있으면(locked = true) 아이템을 알아볼 수 있는 정보(title, seller, description, imageUrl, linkUrl)는 null이다.
- * 가격·태그·추천한 사람 정보·열람 가격은 잠겨 있어도 보여 준다.
+ * 잠겨 있으면(locked = true) 아이템 정보(title, seller, price, tags, description, imageUrl, linkUrl)는 null이다.
+ * 추천한 사람 정보(닉네임·연령대·성별)와 열람 가격은 잠겨 있어도 보여 준다.
  * mine은 보는 사람이 등록자인지다. 등록자에게는 처음부터 열린 상태로 보여 준다.
  */
 public record ItemResponse(
@@ -40,7 +40,7 @@ public record ItemResponse(
     /** 잠긴 정보를 지운 사본 */
     public ItemResponse lock() {
         return new ItemResponse(id, questionId, authorNickname, mine, true,
-                null, null, price, tags, null, null, null,
+                null, null, null, null, null, null, null,
                 targetAgeGroup, targetGender, unlockPrice, createdAt);
     }
 

@@ -1,6 +1,8 @@
 package com.trendizm.backend.item.domain.enums;
 
+import java.util.Arrays;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * 트렌드 아이템 대분류 (ERD item_questions.category, varchar(30)).
@@ -28,5 +30,10 @@ public enum ItemCategory {
     /** 예: FASHION → fashion */
     public String getSlug() {
         return name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /** slug로 찾는다. 예: "fashion" → FASHION. 없으면 빈 Optional */
+    public static Optional<ItemCategory> fromSlug(String slug) {
+        return Arrays.stream(values()).filter(value -> value.getSlug().equals(slug)).findFirst();
     }
 }

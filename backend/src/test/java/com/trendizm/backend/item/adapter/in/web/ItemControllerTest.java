@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.trendizm.backend.auth.adapter.out.security.CustomUserDetails;
 import com.trendizm.backend.auth.adapter.out.security.SecurityConfig;
 import com.trendizm.backend.global.response.PageResponse;
+import com.trendizm.backend.item.application.dto.CreateItemCommand;
 import com.trendizm.backend.item.application.dto.CreateItemQuestionCommand;
 import com.trendizm.backend.item.application.dto.ItemCategoryInfo;
 import com.trendizm.backend.item.application.dto.ItemQuestionQuery;
@@ -72,10 +73,10 @@ class ItemControllerTest {
     }
 
     @Test
-    @DisplayName("로그인하지 않아도 댓글·추천 아이템 목록을 볼 수 있다")
+    @DisplayName("로그인하지 않아도 댓글·추천 아이템 목록을 볼 수 있고, 댓글은 기본 10개씩이다")
     void 비로그인_목록() throws Exception {
-        given(itemService.getComments(eq(1L), isNull(), eq(0), eq(20)))
-                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+        given(itemService.getComments(eq(1L), isNull(), eq(0), eq(10)))
+                .willReturn(new PageResponse<>(List.of(), 0, 10, 0, 0, false));
         given(itemService.getRecommendations(eq(1L), isNull())).willReturn(List.of());
 
         mockMvc.perform(get("/api/items/1/comments")).andExpect(status().isOk());
@@ -83,23 +84,37 @@ class ItemControllerTest {
     }
 
     @Test
-    @DisplayName("목록 필터는 code 값으로 받는다")
+    @DisplayName("목록 필터는 slug 값으로 받는다")
     void 목록_필터() throws Exception {
         given(itemService.getQuestions(new ItemQuestionQuery(ItemCategory.FASHION, ItemSubcategory.SHOES, 1, 10)))
                 .willReturn(new PageResponse<>(List.of(), 1, 10, 0, 0, false));
 
         mockMvc.perform(get("/api/items")
-                        .param("category", "FASHION").param("subcategory", "SHOES")
+                        .param("category", "fashion").param("subcategory", "shoes")
                         .param("page", "1").param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(1));
     }
 
     @Test
-    @DisplayName("없는 카테고리 값이면 400")
+    @DisplayName("없는 카테고리 slug이거나 code 값(FASHION)으로 거르면 400 ITEM_INVALID_CATEGORY")
     void 잘못된_카테고리() throws Exception {
-        mockMvc.perform(get("/api/items").param("category", "FOOD"))
-                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/items").param("category", "food"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ITEM_INVALID_CATEGORY"));
+        mockMvc.perform(get("/api/items").param("subcategory", "CLOTHING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ITEM_INVALID_CATEGORY"));
+        verifyNoInteractions(itemService);
+    }
+
+    @Test
+    @DisplayName("질문 글의 소분류가 없는 slug면 400 ITEM_INVALID_CATEGORY")
+    void 잘못된_소분류() throws Exception {
+        mockMvc.perform(post("/api/items").with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subcategory\":\"socks\",\"title\":\"제목\",\"content\":\"내용\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ITEM_INVALID_CATEGORY"));
         verifyNoInteractions(itemService);
     }
 
@@ -107,7 +122,7 @@ class ItemControllerTest {
     @DisplayName("로그인하지 않으면 글·댓글·공감·추천을 등록할 수 없다")
     void 비로그인_쓰기() throws Exception {
         mockMvc.perform(post("/api/items").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"subcategory\":\"CLOTHING\",\"title\":\"제목\",\"content\":\"내용\"}"))
+                        .content("{\"subcategory\":\"clothing\",\"title\":\"제목\",\"content\":\"내용\"}"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/items/1/comments").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"댓글\"}"))
@@ -126,7 +141,7 @@ class ItemControllerTest {
         given(itemService.createQuestion(any())).willReturn(QUESTION);
 
         mockMvc.perform(post("/api/items").with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"subcategory\":\"CLOTHING\",\"title\":\"  양말 추천해주세요 \",\"content\":\"내용\"}"))
+                        .content("{\"subcategory\":\"clothing\",\"title\":\"  양말 추천해주세요 \",\"content\":\"내용\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1));
         verify(itemService).createQuestion(
@@ -137,7 +152,7 @@ class ItemControllerTest {
     @DisplayName("제목이 비어 있으면 400 INVALID_INPUT")
     void 빈_제목() throws Exception {
         mockMvc.perform(post("/api/items").with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"subcategory\":\"CLOTHING\",\"title\":\" \",\"content\":\"내용\"}"))
+                        .content("{\"subcategory\":\"clothing\",\"title\":\" \",\"content\":\"내용\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
         verifyNoInteractions(itemService);
@@ -164,5 +179,26 @@ class ItemControllerTest {
 
         verify(itemService).likeComment(3L, 7L);
         verify(itemService).unlikeComment(3L, 7L);
+    }
+
+    @Test
+    @DisplayName("이미지·링크가 비어 있거나 Https처럼 대문자로 시작해도 받는다")
+    void 이미지_링크_허용() throws Exception {
+        given(itemService.createRecommendation(any())).willReturn(null);
+
+        mockMvc.perform(post("/api/items/1/recommendations").with(user(LOGIN_USER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"양말\",\"description\":\"설명\",\"imageUrl\":\"\",\"linkUrl\":\"  \"}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/items/1/recommendations").with(user(LOGIN_USER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"양말\",\"description\":\"설명\","
+                                + "\"imageUrl\":\"Https://img.test/a.jpg\",\"linkUrl\":\"HTTP://shop.test/a\"}"))
+                .andExpect(status().isCreated());
+
+        verify(itemService).createRecommendation(new CreateItemCommand(1L, 7L, "양말", null, null, List.of(), "설명",
+                null, null));
+        verify(itemService).createRecommendation(new CreateItemCommand(1L, 7L, "양말", null, null, List.of(), "설명",
+                "Https://img.test/a.jpg", "HTTP://shop.test/a"));
     }
 }

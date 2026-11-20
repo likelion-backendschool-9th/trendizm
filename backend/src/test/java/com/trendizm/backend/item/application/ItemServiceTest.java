@@ -79,7 +79,7 @@ class ItemServiceTest {
         ItemQuestionResponse created = itemService.createQuestion(
                 new CreateItemQuestionCommand(asker, ItemSubcategory.SHOES, "운동화", "추천해 주세요"));
 
-        assertThat(created.category().code()).isEqualTo("FASHION");
+        assertThat(created.category().slug()).isEqualTo("fashion");
         assertThat(created.subcategory().slug()).isEqualTo("shoes");
         assertThat(created.subcategory().label()).isEqualTo("신발");
         assertThat(created.authorNickname()).isEqualTo("질문자");
@@ -241,7 +241,7 @@ class ItemServiceTest {
     }
 
     @Test
-    @DisplayName("추천 아이템은 등록자에게는 열린 상태, 다른 사람과 비로그인에게는 잠긴 상태로 보인다")
+    @DisplayName("추천 아이템은 등록자에게는 열린 상태, 다른 사람과 비로그인에게는 잠긴 상태(아이템 정보 null)로 보인다")
     void 추천_아이템_잠금() {
         Long questionId = question(ItemSubcategory.CLOTHING);
         ItemResponse created = recommend(questionId, recommender);
@@ -262,8 +262,8 @@ class ItemServiceTest {
             assertThat(locked.description()).isNull();
             assertThat(locked.imageUrl()).isNull();
             assertThat(locked.linkUrl()).isNull();
-            assertThat(locked.price()).isEqualTo(12000);
-            assertThat(locked.tags()).containsExactly("화이트", "폭신한 재질");
+            assertThat(locked.price()).isNull();
+            assertThat(locked.tags()).isNull();
             assertThat(locked.unlockPrice()).isEqualTo(100);
             assertThat(locked.authorNickname()).isEqualTo("추천자");
         }
