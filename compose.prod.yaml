@@ -1,0 +1,103 @@
+# 배포 서버(뉴렉처 cloud.newlecture.com)용 설정. 서버의 ~/trendizm에 .env와 함께 둔다.
+# 배포는 .github/workflows/deploy.yml이 자동으로 한다. 직접 실행할 때:
+#   docker compose -f compose.prod.yaml pull && docker compose -f compose.prod.yaml up -d
+#
+# 접속 경로: https://trendizm.newlecture.com → 서버 nginx(443, certbot 인증서) → 127.0.0.1:3013 → frontend
+# frontend는 서버 안(127.0.0.1)에만 연다. 0.0.0.0으로 열면 https를 거치지 않는 입구가 생기고,
+# Docker는 방화벽(ufw) 규칙을 우회하므로 방화벽으로 막을 수 없다.
+# 브라우저는 Next 서버(BFF)만 부르고, backend·postgres·redis는 compose 내부 네트워크에서만 접근한다.
+# 컨테이너는 root가 아닌 사용자로 돌리고, 필요 없는 리눅스 권한(capabilities)은 뺀다.
+
+name: trendizm
+
+x-hardening: &hardening
+  restart: unless-stopped
+  # 공용 서버 디스크가 로그로 차지 않게 컨테이너마다 10MB × 3개까지만 남긴다
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  postgres:
+    <<: *hardening
+    # 태그와 digest로 고정한다 (공개 7일 지난 버전). 17-alpine처럼 열어 두면 배포 때마다 갓 나온 이미지를 받는다
+    image: postgres:17.11-alpine@sha256:e5d2edd28b1f8d40a0a6c0c9cdc545b19b56a0d5d88f94bc11a97d970d4700d0
+    # 이미지가 시작할 때 데이터 폴더 소유자를 맞추고 postgres 사용자로 바꾸는 데 필요한 권한만 돌려준다
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    environment:
+      POSTGRES_DB: ${DB_NAME:?.env에 DB_NAME을 설정하세요}
+      POSTGRES_USER: ${DB_USERNAME:?.env에 DB_USERNAME을 설정하세요}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?.env에 DB_PASSWORD를 설정하세요}
+      TZ: Asia/Seoul
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    <<: *hardening
+    image: redis:7.4.12-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    # DAC_OVERRIDE: 재시작 때 시작 스크립트(root)가 redis 소유의 AOF 폴더를 읽어야 한다
+    cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]
+    # AOF: 명령마다 디스크에 기록해서, 재시작해도 로그인 상태(리프레시 토큰)가 거의 사라지지 않는다
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    <<: *hardening
+    image: ${IMAGE_PREFIX:-ghcr.io/likelion-backendschool-9th/trendizm}-backend:${IMAGE_TAG:-develop}
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      # 1차 검사까지는 엔티티 기준으로 테이블을 만든다. 칼럼 삭제·변경은 반영되지 않는다 (Flyway 도입은 팀에서 정하기)
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_OPEN_IN_VIEW: "false"
+      TRENDIZM_JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
+      TZ: Asia/Seoul
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    <<: *hardening
+    image: ${IMAGE_PREFIX:-ghcr.io/likelion-backendschool-9th/trendizm}-frontend:${IMAGE_TAG:-develop}
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=1000,gid=1000
+    environment:
+      BACKEND_URL: http://backend:8080
+      # https로만 접속하므로 Secure 쿠키를 쓴다. http로 접속하는 환경에서만 .env에서 false로 바꾼다
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:3013:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:
+  redis-data:
