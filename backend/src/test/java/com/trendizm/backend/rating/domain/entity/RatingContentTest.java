@@ -71,6 +71,18 @@ class RatingContentTest {
     }
 
     @Test
+    @DisplayName("추가 정보에 빈 값(null)이 있어도 만들 수 있다")
+    void 추가_정보_null() {
+        Map<String, Object> extra = new HashMap<>();
+        extra.put("season", null);
+
+        RatingContent content = RatingContent.create(RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING,
+                "드라마", null, null, null, null, extra);
+
+        assertThat(content.getExtra()).containsEntry("season", null);
+    }
+
+    @Test
     @DisplayName("소분류 19개가 대분류 6개에 나뉘어 있고, slug는 소문자와 하이픈이다")
     void 카테고리() {
         assertThat(RatingContentCategory.values()).hasSize(6);

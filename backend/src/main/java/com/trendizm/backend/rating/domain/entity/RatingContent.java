@@ -15,6 +15,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import lombok.AccessLevel;
@@ -85,7 +87,8 @@ public class RatingContent extends BaseCreatedEntity {
         this.imageUrl = imageUrl;
         this.ageRating = ageRating;
         this.releasedAt = releasedAt;
-        this.extra = extra == null ? Map.of() : Map.copyOf(extra);
+        // Map.copyOf는 null 값을 받지 못해서(JSON에는 null이 올 수 있다) 복사본을 읽기 전용으로 감싼다
+        this.extra = extra == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(extra));
     }
 
     public static RatingContent create(RatingContentSubcategory subcategory, RatingContentStatus status, String title,
