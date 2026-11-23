@@ -1,1 +1,11 @@
+// 플러그인을 받을 곳. 지정하지 않으면 플러그인과 그 부품(spring-core 등)을 모두 Gradle Plugin Portal에서만 찾는다.
+// Plugin Portal은 Maven Central의 라이브러리를 중계해 주는데, 중계가 잠깐 실패하면 "Could not find"로 빌드가 깨진다
+// (CI 첫 실행에서 실제로 발생). 부품은 원래 있는 Maven Central에서 직접 받고, 플러그인 자체만 Plugin Portal에서 받는다.
+pluginManagement {
+	repositories {
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
 rootProject.name = 'backend'
