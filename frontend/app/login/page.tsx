@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { apiFetch } from "@/lib/api/client";
 import { ApiError, type LoginMember } from "@/lib/api/types";
+import { sameOriginUrl } from "@/lib/safeRedirect";
 
 // 와이어프레임: 로그인 (login)
 // 오류 상태: 필수값 또는 이메일 형식 오류는 해당 입력 필드 아래에 표시한다.
@@ -32,16 +33,12 @@ const FIELDS: { name: FieldName; type: string; label: string; placeholder: strin
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * 로그인 후 돌아갈 주소. 같은 사이트 안의 경로만 쓴다(열린 리다이렉트 방지).
- * "//evil.com", "/\evil.com"은 브라우저가 다른 사이트로 해석하므로 막는다.
+ * 로그인 후 돌아갈 주소. 같은 사이트 안의 주소만 쓴다(열린 리다이렉트 방지, lib/safeRedirect.ts).
  * useSearchParams 대신 제출 순간에 주소창을 읽는다. 훅을 쓰면 운영 빌드에서 Suspense가 필요하다.
  */
 function nextPath(): string {
   const next = new URLSearchParams(window.location.search).get("next");
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) {
-    return "/";
-  }
-  return next;
+  return sameOriginUrl(next, window.location.origin);
 }
 
 /** 서버에 보내기 전에 입력칸을 검사한다. 메시지는 백엔드 검증 메시지와 같게 둔다 */
