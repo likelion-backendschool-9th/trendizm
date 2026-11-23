@@ -160,7 +160,6 @@ npm·pnpm 패키지와 Gradle 의존성도 공급망 공격 대상이다. 정상
 - 커밋과 PR 제목은 `<type>: <subject>` 형식이다. subject는 한국어로, 60자 이내, 마침표 없이 쓴다.
 - PR 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 따른다.
 - CI(`.github/workflows/ci.yml`)가 작업 브랜치 push와 develop·main으로 가는 PR마다 백엔드 테스트(`backend`), 프론트 lint·운영 빌드(`frontend`)를 돌린다. PR 검사가 통과해야 머지할 수 있다. PR을 올리기 전에 로컬에서 `./gradlew test`, `npm run lint`, `npm run build`로 미리 확인할 수 있다. lint는 경고도 실패로 친다.
-- `.github/` 아래 파일(워크플로 등)을 바꾸는 PR은 `.github/CODEOWNERS`에 적힌 사람의 리뷰가 필요하다.
 
 ### Java4Shell(CVE-2026-114938) 대응
 

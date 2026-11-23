@@ -1,4 +1,0 @@
-# 워크플로(CI·배포)와 저장소 설정 파일은 CI·배포 담당(kjy-ux) 또는 팀장(JoostLean)의 리뷰를 받아야 머지된다.
-# PR이 ci.yml을 고쳐 검사를 꺼 버리거나, 같은 이름의 가짜 검사를 만드는 것을 막기 위해서다.
-# 효력은 Ruleset(merge-protection)의 "Require review from Code Owners"를 켜야 생긴다.
-/.github/ @kjy-ux @JoostLean
