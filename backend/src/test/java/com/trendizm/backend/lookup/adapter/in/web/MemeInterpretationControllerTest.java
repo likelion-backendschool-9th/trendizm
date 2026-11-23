@@ -73,6 +73,35 @@ class MemeInterpretationControllerTest {
     }
 
     @Test
+    @DisplayName("출처·썸네일 주소가 http(s)://가 아니면 400 INVALID_INPUT (javascript: 주소로 XSS 방지)")
+    void 잘못된_주소() throws Exception {
+        for (String field : List.of("sourceUrl", "thumbnailUrl")) {
+            for (String url : List.of("javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "ftp://example.com/a",
+                    "https://example.com/a b")) {
+                mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"word\":\"TMI\",\"meaning\":\"뜻\",\"content\":\"내용\",\"%s\":\"%s\"}"
+                                        .formatted(field, url)))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+            }
+        }
+        verifyNoInteractions(interpretationService);
+    }
+
+    @Test
+    @DisplayName("주소는 대소문자와 관계없이 http(s)://면 받고, 빈 값은 null로 넘긴다")
+    void 허용되는_주소() throws Exception {
+        CreateMemeInterpretationCommand command = new CreateMemeInterpretationCommand(
+                "TMI", 7L, "뜻", "내용", "HTTP://example.com/a", null, null);
+        given(interpretationService.createInterpretation(command)).willReturn(INTERPRETATION);
+
+        mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"word\":\"TMI\",\"meaning\":\"뜻\",\"content\":\"내용\","
+                                + "\"sourceUrl\":\"HTTP://example.com/a\",\"thumbnailUrl\":\"\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     @DisplayName("단어가 100자를 넘으면 400 INVALID_INPUT")
     void 긴_단어() throws Exception {
         mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)

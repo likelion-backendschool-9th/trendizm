@@ -9,6 +9,9 @@ public enum MemeErrorCode implements ErrorCode {
     /** 문서가 없거나 숨김 상태. 숨김 문서도 없는 문서와 같은 응답을 준다 */
     MEME_NOT_FOUND(HttpStatus.NOT_FOUND, "밈 문서를 찾을 수 없습니다."),
 
+    /** normalizeWord로 바꾼 단어가 word 칼럼 길이(100자)를 넘음. 예: "İ"는 소문자로 바꾸면 2글자가 된다 */
+    MEME_WORD_TOO_LONG(HttpStatus.BAD_REQUEST, "단어가 너무 깁니다. 100자 이하로 입력해 주세요."),
+
     /** 같은 새 단어로 거의 동시에 문서가 만들어져 word UNIQUE에 막힘. 다시 시도하면 만들어진 문서에 의견이 붙는다 */
     MEME_ALREADY_EXISTS(HttpStatus.CONFLICT, "같은 단어의 문서가 방금 만들어졌습니다. 다시 시도해 주세요.");
 

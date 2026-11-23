@@ -41,8 +41,14 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     @Override
     @Transactional
     public MemeInterpretationResponse createInterpretation(CreateMemeInterpretationCommand command) {
+        String word = Meme.normalizeWord(command.word());
+        // 요청 검증(100자)은 바꾸기 전 길이라, 소문자로 바꾸며 길어진 단어는 여기서 막는다.
+        // 막지 않으면 DB 길이 오류가 아래 중복 처리(MEME_ALREADY_EXISTS)로 잘못 바뀐다
+        if (word.length() > Meme.MAX_WORD_LENGTH) {
+            throw new BusinessException(MemeErrorCode.MEME_WORD_TOO_LONG);
+        }
         // 숨김 문서도 찾아야 한다. 공개 문서만 찾으면 숨김 단어를 새로 저장하려다 word UNIQUE 위반이 난다
-        Meme meme = memeRepository.findByWord(Meme.normalizeWord(command.word()))
+        Meme meme = memeRepository.findByWord(word)
                 .orElseGet(() -> createMeme(command));
         if (meme.isHidden()) {
             throw new BusinessException(MemeErrorCode.MEME_NOT_FOUND);

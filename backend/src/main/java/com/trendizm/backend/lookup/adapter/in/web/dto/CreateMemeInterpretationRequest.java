@@ -2,11 +2,13 @@ package com.trendizm.backend.lookup.adapter.in.web.dto;
 
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
  * 의견 작성. 단어는 경로가 아니라 본문으로 받는다('/'·'%'가 들어간 단어 때문).
  * 출처 값은 선택이고, 이 의견으로 문서가 새로 만들어질 때만 문서의 대표 출처로 저장된다.
+ * 주소는 http://, https://만 받는다. javascript: 같은 주소가 링크로 그대로 나가면 클릭할 때 스크립트가 실행된다(XSS).
  * 예: { "word": "알잘딱깔센", "meaning": "알아서 잘 딱 깔끔하고 센스 있게", "content": "...", "sourceUrl": "https://..." }
  */
 public record CreateMemeInterpretationRequest(
@@ -23,14 +25,19 @@ public record CreateMemeInterpretationRequest(
         String content,
 
         @Size(max = 500, message = "출처 주소는 500자 이하여야 합니다.")
+        @Pattern(regexp = WEB_URL, message = "출처 주소는 http:// 또는 https://로 시작해야 합니다.")
         String sourceUrl,
 
         @Size(max = 255, message = "출처 제목은 255자 이하여야 합니다.")
         String title,
 
         @Size(max = 500, message = "썸네일 주소는 500자 이하여야 합니다.")
+        @Pattern(regexp = WEB_URL, message = "썸네일 주소는 http:// 또는 https://로 시작해야 합니다.")
         String thumbnailUrl
 ) {
+
+    /** 비어 있거나(선택 값), http(s)://로 시작하고 공백이 없는 주소. 대소문자는 무시한다 */
+    private static final String WEB_URL = "(?i)\\s*|https?://\\S+";
 
     public CreateMemeInterpretationCommand toCommand(Long userId) {
         return new CreateMemeInterpretationCommand(

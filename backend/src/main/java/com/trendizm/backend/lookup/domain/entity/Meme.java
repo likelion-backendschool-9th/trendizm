@@ -27,11 +27,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Meme extends BaseCreatedEntity {
 
+    /** word 칼럼 길이. normalizeWord로 바꾼 뒤의 길이를 이 값으로 확인한다 */
+    public static final int MAX_WORD_LENGTH = 100;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true, length = MAX_WORD_LENGTH)
     private String word;
 
     /** 대표 출처 주소 (피드·동영상·게시물 링크) */
@@ -71,6 +74,7 @@ public class Meme extends BaseCreatedEntity {
      * - 대소문자: 소문자로 저장해서 TMI와 tmi는 같은 문서다. word UNIQUE가 DB에서 중복을 막는다.
      * - 띄어쓰기: 다른 단어로 본다("알잘딱 깔센"과 "알잘딱깔센"은 다른 문서).
      * Locale.ROOT: 실행 환경 언어 설정(예: 터키어)에 따라 i·I 변환이 달라지지 않게 한다.
+     * 소문자로 바꾸면 길어지는 글자가 있다(예: "İ" → "i̇" 2글자). 저장 전에는 바꾼 뒤의 길이를 MAX_WORD_LENGTH로 확인한다.
      */
     public static String normalizeWord(String word) {
         return word.strip().toLowerCase(Locale.ROOT);

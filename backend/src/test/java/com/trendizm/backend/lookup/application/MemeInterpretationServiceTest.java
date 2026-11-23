@@ -93,6 +93,18 @@ class MemeInterpretationServiceTest {
     }
 
     @Test
+    @DisplayName("소문자로 바꾸면 100자를 넘는 단어는 MEME_WORD_TOO_LONG (\"İ\"는 소문자로 2글자)")
+    void 소문자로_길어지는_단어() {
+        assertThatThrownBy(() -> interpretationService.createInterpretation(command("İ".repeat(51))))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(MemeErrorCode.MEME_WORD_TOO_LONG);
+
+        MemeInterpretationResponse created = interpretationService.createInterpretation(command("İ".repeat(50)));
+        assertThat(created.memeId()).isNotNull();
+    }
+
+    @Test
     @DisplayName("숨김 문서의 단어로 쓰면 새 문서를 만들지 않고 MEME_NOT_FOUND")
     void 숨김_문서에_작성() {
         assertThatThrownBy(() -> interpretationService.createInterpretation(command("알숨김")))
