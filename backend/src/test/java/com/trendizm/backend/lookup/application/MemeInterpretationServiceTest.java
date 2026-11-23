@@ -99,7 +99,7 @@ class MemeInterpretationServiceTest {
 
         assertThat(created.memeId()).isEqualTo(tmi.getId());
         assertThat(memeService.getMeme(tmi.getId()).title()).isNull();
-        assertThat(memeService.getMemesByWord("tmi", 0, 20).totalElements()).isEqualTo(1);
+        assertThat(memeService.getMemesByWord("tmi", null, 0, 20).totalElements()).isEqualTo(1);
     }
 
     @Test
@@ -109,7 +109,7 @@ class MemeInterpretationServiceTest {
                 interpretationService.createInterpretation(command("TMI", "https://x.com/someone/status/1"));
 
         assertThat(created.memeId()).isNotEqualTo(tmi.getId());
-        assertThat(memeService.getMemesByWord("tmi", 0, 20).content()).extracting(MemeResponse::id)
+        assertThat(memeService.getMemesByWord("tmi", null, 0, 20).content()).extracting(MemeResponse::id)
                 .containsExactly(created.memeId(), tmi.getId());
     }
 

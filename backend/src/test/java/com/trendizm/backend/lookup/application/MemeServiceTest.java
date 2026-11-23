@@ -50,7 +50,7 @@ class MemeServiceTest {
     @Test
     @DisplayName("단어로 찾으면 출처별 공개 문서 목록을 최근 등록순으로 준다 (대소문자·앞뒤 공백 무시, 숨김 제외)")
     void 단어로_목록() {
-        PageResponse<MemeResponse> page = memeService.getMemesByWord(" Tmi ", 0, 20);
+        PageResponse<MemeResponse> page = memeService.getMemesByWord(" Tmi ", null, 0, 20);
 
         assertThat(page.content()).extracting(MemeResponse::id).containsExactly(tmiPost.getId(), tmiVideo.getId());
         assertThat(page.content()).extracting(MemeResponse::sourceUrl)
@@ -60,8 +60,25 @@ class MemeServiceTest {
     @Test
     @DisplayName("띄어쓰기가 다르거나 없는 단어면 빈 목록")
     void 단어로_목록_없음() {
-        assertThat(memeService.getMemesByWord("알잘딱 깔센", 0, 20).content()).isEmpty();
-        assertThat(memeService.getMemesByWord("없는단어", 0, 20).content()).isEmpty();
+        assertThat(memeService.getMemesByWord("알잘딱 깔센", null, 0, 20).content()).isEmpty();
+        assertThat(memeService.getMemesByWord("없는단어", null, 0, 20).content()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("출처 주소를 함께 주면 그 출처의 문서만 준다 (모바일 링크로 찾아도 같은 문서)")
+    void 단어와_출처로_찾기() {
+        PageResponse<MemeResponse> page = memeService.getMemesByWord("TMI", "https://m.youtube.com/watch?v=tmi01&t=3s", 0, 20);
+
+        assertThat(page.content()).extracting(MemeResponse::id).containsExactly(tmiVideo.getId());
+        assertThat(page.totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("출처가 다르거나 숨김 문서면 빈 목록이고, 빈 출처 주소는 출처로 거르지 않는다")
+    void 단어와_출처로_찾기_없음() {
+        assertThat(memeService.getMemesByWord("TMI", "https://example.com/other", 0, 20).content()).isEmpty();
+        assertThat(memeService.getMemesByWord("TMI", "https://example.com/hidden", 0, 20).content()).isEmpty();
+        assertThat(memeService.getMemesByWord("TMI", " ", 0, 20).totalElements()).isEqualTo(2);
     }
 
     @Test

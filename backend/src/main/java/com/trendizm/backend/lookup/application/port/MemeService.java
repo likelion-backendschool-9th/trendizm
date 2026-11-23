@@ -16,8 +16,11 @@ public interface MemeService {
      */
     PageResponse<MemeResponse> getMemes(String keyword, int page, int size);
 
-    /** 단어가 같은 공개 문서 목록 (출처별, 최근 등록순). 대소문자 무시, 띄어쓰기는 구분. 없으면 빈 목록 */
-    PageResponse<MemeResponse> getMemesByWord(String word, int page, int size);
+    /**
+     * 단어가 같은 공개 문서 목록 (출처별, 최근 등록순). 대소문자 무시, 띄어쓰기는 구분. 없으면 빈 목록.
+     * sourceUrl을 주면 정규화한 주소가 같은 문서만 준다((단어, 출처) UNIQUE라 0개 또는 1개). 비어 있으면 출처로 거르지 않는다
+     */
+    PageResponse<MemeResponse> getMemesByWord(String word, String sourceUrl, int page, int size);
 
     /** 문서 하나. 없거나 숨김이면 MEME_NOT_FOUND */
     MemeResponse getMeme(Long memeId);

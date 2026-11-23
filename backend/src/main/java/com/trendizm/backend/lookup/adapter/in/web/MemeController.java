@@ -6,6 +6,7 @@ import com.trendizm.backend.lookup.application.port.MemeService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,17 +39,25 @@ public class MemeController {
         return memeService.getMemes(keyword, page, size);
     }
 
-    /** 단어가 정확히 같은 문서 목록(출처별). 예: GET /api/lookup/memes?q=알잘딱깔센 (URL 인코딩해서 보낸다) */
+    /**
+     * 단어가 정확히 같은 문서 목록(출처별). 예: GET /api/lookup/memes?q=알잘딱깔센
+     * sourceUrl을 주면 그 출처의 문서만(0개 또는 1개). 예: ?q=알잘딱깔센&amp;sourceUrl=https%3A%2F%2Fyoutu.be%2Fabc
+     * 값은 URL 인코딩해서 보낸다. 출처 주소의 ?·&amp;를 인코딩하지 않으면 다른 파라미터로 잘린다
+     */
     @GetMapping(params = "q")
     public PageResponse<MemeResponse> getMemesByWord(
             @RequestParam
             @NotBlank(message = "단어를 입력해 주세요.")
             @Size(max = 100, message = "단어는 100자 이하여야 합니다.") String q,
+            @RequestParam(required = false)
+            @Size(max = 500, message = "출처 주소는 500자 이하여야 합니다.")
+            @Pattern(regexp = "(?i)\\s*|https?://\\S+", message = "출처 주소는 http:// 또는 https://로 시작해야 합니다.")
+            String sourceUrl,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
             @Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
-        return memeService.getMemesByWord(q, page, size);
+        return memeService.getMemesByWord(q, sourceUrl, page, size);
     }
 
     /** 문서 하나. 목록에서 고른 문서를 조회한다 */
