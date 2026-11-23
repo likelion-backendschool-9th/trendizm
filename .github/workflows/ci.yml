@@ -90,7 +90,7 @@ jobs:
       - name: 의존성 설치
         run: docker run --rm -v "$PWD/frontend:/app" -w /app "$NODE_IMAGE" npm ci --ignore-scripts
 
-      # 경고도 실패로 친다(package.json의 lint가 --max-warnings=0). 로컬 npm run lint와 같은 기준이다
+      # 로컬 npm run lint와 같은 명령이다. 오류만 실패로 치고 경고는 허용한다(팀 결정)
       - name: lint
         run: docker run --rm -v "$PWD/frontend:/app" -w /app "$NODE_IMAGE" npm run lint
 
