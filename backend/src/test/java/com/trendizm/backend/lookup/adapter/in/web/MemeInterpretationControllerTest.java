@@ -35,7 +35,7 @@ class MemeInterpretationControllerTest {
     private static final String CREATE = "/api/lookup/interpretations";
     private static final String LIST = "/api/lookup/memes/{memeId}/interpretations";
     private static final MemeInterpretationResponse INTERPRETATION = new MemeInterpretationResponse(
-            1L, 3L, 7L, "알아서 잘 딱 깔끔하고 센스 있게", "내용", 0, 0, LocalDateTime.now(), LocalDateTime.now());
+            1L, 3L, 7L, "밈장인", "알아서 잘 딱 깔끔하고 센스 있게", "내용", 0, 0, LocalDateTime.now(), LocalDateTime.now());
 
     @Autowired
     private MockMvc mockMvc;
@@ -99,7 +99,8 @@ class MemeInterpretationControllerTest {
 
         mockMvc.perform(get(LIST, 3L))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].meaning").value("알아서 잘 딱 깔끔하고 센스 있게"));
+                .andExpect(jsonPath("$.content[0].meaning").value("알아서 잘 딱 깔끔하고 센스 있게"))
+                .andExpect(jsonPath("$.content[0].authorNickname").value("밈장인"));
     }
 
     @Test

@@ -15,6 +15,8 @@ import com.trendizm.backend.lookup.application.port.out.MemeInterpretationReposi
 import com.trendizm.backend.lookup.application.port.out.MemeRepository;
 import com.trendizm.backend.lookup.domain.entity.Meme;
 import com.trendizm.backend.lookup.domain.entity.MemeInterpretation;
+import com.trendizm.backend.member.application.dto.RegisterMemberCommand;
+import com.trendizm.backend.member.application.port.MemberService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,22 +39,32 @@ class MemeInterpretationServiceTest {
     private MemeRepository memeRepository;
 
     @Autowired
+    private MemberService memberService;
+
+    @Autowired
     private MemeInterpretationRepository interpretationRepository;
 
+    /** 없는 회원 id. 닉네임이 "탈퇴한 회원"으로 나온다 */
+    private static final Long UNKNOWN_USER = -1L;
+
+    private Long writer;
+    private Long reader;
     private Meme tmi;
     private Meme hidden;
 
-    /** 공개 문서 tmi(의견 없음), 숨김 문서 알숨김. 테스트가 끝나면 롤백된다 */
+    /** 회원 2명, 공개 문서 tmi(의견 없음), 숨김 문서 알숨김. 테스트가 끝나면 롤백된다 */
     @BeforeEach
     void setUp() {
+        writer = memberService.register(new RegisterMemberCommand("writer@test.com", "encoded", "밈장인", false));
+        reader = memberService.register(new RegisterMemberCommand("reader@test.com", "encoded", "TMI러", false));
         tmi = memeRepository.save(Meme.create("TMI", 1L, null, null, null));
         hidden = Meme.create("알숨김", 1L, null, null, null);
         hidden.hide();
         memeRepository.save(hidden);
     }
 
-    private static CreateMemeInterpretationCommand command(String word) {
-        return new CreateMemeInterpretationCommand(word, 2L, "뜻", "내용", "https://video.example.com/watch/01", "영상 제목", null);
+    private CreateMemeInterpretationCommand command(String word) {
+        return new CreateMemeInterpretationCommand(word, writer, "뜻", "내용", "https://video.example.com/watch/01", "영상 제목", null);
     }
 
     @Test
@@ -62,7 +74,8 @@ class MemeInterpretationServiceTest {
 
         MemeResponse meme = memeService.getMeme("알잘딱깔센");
         assertThat(created.memeId()).isEqualTo(meme.id());
-        assertThat(created.userId()).isEqualTo(2L);
+        assertThat(created.userId()).isEqualTo(writer);
+        assertThat(created.authorNickname()).isEqualTo("밈장인");
         assertThat(created.agreeCount()).isZero();
         assertThat(created.disagreeCount()).isZero();
         assertThat(meme.sourceUrl()).isEqualTo("https://video.example.com/watch/01");
@@ -103,6 +116,19 @@ class MemeInterpretationServiceTest {
     }
 
     @Test
+    @DisplayName("목록에 작성자 닉네임을 붙이고, 없는 회원은 '탈퇴한 회원'으로 보여 준다")
+    void 작성자_닉네임() {
+        saveWithVotes(writer, "밈장인 의견", 2, 0);
+        saveWithVotes(reader, "TMI러 의견", 1, 0);
+        saveWithVotes(UNKNOWN_USER, "탈퇴 회원 의견", 0, 0);
+
+        PageResponse<MemeInterpretationResponse> page = interpretationService.getInterpretations(tmi.getId(), 0, 20);
+
+        assertThat(page.content()).extracting(MemeInterpretationResponse::authorNickname)
+                .containsExactly("밈장인", "TMI러", "탈퇴한 회원");
+    }
+
+    @Test
     @DisplayName("목록도 페이지 크기만큼 나눠서 보여 준다")
     void 목록_페이지() {
         for (int i = 0; i < 3; i++) {
@@ -127,9 +153,13 @@ class MemeInterpretationServiceTest {
         }
     }
 
-    /** 투표 기능 전이라 찬성·반대 수는 필드에 직접 넣는다 */
     private MemeInterpretation saveWithVotes(String meaning, int agree, int disagree) {
-        MemeInterpretation interpretation = MemeInterpretation.create(tmi.getId(), 1L, meaning, "내용");
+        return saveWithVotes(writer, meaning, agree, disagree);
+    }
+
+    /** 투표 기능 전이라 찬성·반대 수는 필드에 직접 넣는다 */
+    private MemeInterpretation saveWithVotes(Long userId, String meaning, int agree, int disagree) {
+        MemeInterpretation interpretation = MemeInterpretation.create(tmi.getId(), userId, meaning, "내용");
         ReflectionTestUtils.setField(interpretation, "agreeCount", agree);
         ReflectionTestUtils.setField(interpretation, "disagreeCount", disagree);
         return interpretationRepository.save(interpretation);

@@ -10,6 +10,14 @@ import com.trendizm.backend.lookup.application.port.out.MemeInterpretationReposi
 import com.trendizm.backend.lookup.application.port.out.MemeRepository;
 import com.trendizm.backend.lookup.domain.entity.Meme;
 import com.trendizm.backend.lookup.domain.entity.MemeInterpretation;
+import com.trendizm.backend.member.application.dto.MemberInfo;
+import com.trendizm.backend.member.application.port.MemberService;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -22,8 +30,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class MemeInterpretationServiceImpl implements MemeInterpretationService {
 
+    /** 탈퇴했거나 없는 회원의 표시 이름 (item·rating과 같은 문구) */
+    static final String UNKNOWN_AUTHOR = "탈퇴한 회원";
+
     private final MemeRepository memeRepository;
     private final MemeInterpretationRepository interpretationRepository;
+    private final MemberService memberService;
 
     /** 문서 생성과 의견 저장이 한 트랜잭션이라, 의견 저장이 실패하면 새 문서도 롤백되어 빈 문서가 남지 않는다 */
     @Override
@@ -37,7 +49,8 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
         }
         MemeInterpretation interpretation = interpretationRepository.save(MemeInterpretation.create(
                 meme.getId(), command.userId(), command.meaning(), command.content()));
-        return MemeInterpretationResponse.from(interpretation);
+        return MemeInterpretationResponse.from(interpretation)
+                .withAuthor(nicknames(Set.of(command.userId())).get(command.userId()));
     }
 
     private Meme createMeme(CreateMemeInterpretationCommand command) {
@@ -57,6 +70,24 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
                 .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
         Page<MemeInterpretation> interpretations =
                 interpretationRepository.findByMemeIdOrderByTrust(meme.getId(), PageRequest.of(page, size));
-        return PageResponse.from(interpretations, MemeInterpretationResponse::from);
+        Map<Long, String> nicknames = nicknames(
+                interpretations.getContent().stream().map(MemeInterpretation::getUserId).toList());
+        return PageResponse.from(interpretations,
+                interpretation -> MemeInterpretationResponse.from(interpretation)
+                        .withAuthor(nicknames.get(interpretation.getUserId())));
+    }
+
+    /** 회원 id → 닉네임. 목록의 작성자를 한 번에 가져온다. 탈퇴했거나 없는 회원은 UNKNOWN_AUTHOR */
+    private Map<Long, String> nicknames(Collection<Long> userIds) {
+        Set<Long> ids = new HashSet<>(userIds);
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, MemberInfo> members = memberService.getMembers(ids);
+        return ids.stream().collect(Collectors.toMap(Function.identity(), id -> displayName(members.get(id))));
+    }
+
+    private static String displayName(MemberInfo member) {
+        return member == null || member.withdrawn() ? UNKNOWN_AUTHOR : member.nickname();
     }
 }

@@ -12,6 +12,7 @@ import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
 import com.trendizm.backend.lookup.application.port.out.MemeInterpretationRepository;
 import com.trendizm.backend.lookup.application.port.out.MemeRepository;
 import com.trendizm.backend.lookup.domain.entity.Meme;
+import com.trendizm.backend.member.application.port.MemberService;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,8 +23,9 @@ class MemeInterpretationServiceImplTest {
 
     private final MemeRepository memeRepository = mock(MemeRepository.class);
     private final MemeInterpretationRepository interpretationRepository = mock(MemeInterpretationRepository.class);
+    private final MemberService memberService = mock(MemberService.class);
     private final MemeInterpretationServiceImpl service =
-            new MemeInterpretationServiceImpl(memeRepository, interpretationRepository);
+            new MemeInterpretationServiceImpl(memeRepository, interpretationRepository, memberService);
 
     @Test
     @DisplayName("조회와 저장 사이에 다른 요청이 같은 단어로 문서를 만들면 409 MEME_ALREADY_EXISTS")
