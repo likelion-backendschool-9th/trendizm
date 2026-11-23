@@ -51,7 +51,7 @@ public class MemeController {
             @Size(max = 100, message = "단어는 100자 이하여야 합니다.") String q,
             @RequestParam(required = false)
             @Size(max = 500, message = "출처 주소는 500자 이하여야 합니다.")
-            @Pattern(regexp = "(?i)\\s*|https?://\\S+", message = "출처 주소는 http:// 또는 https://로 시작해야 합니다.")
+            @Pattern(regexp = WebUrlPattern.OPTIONAL, message = "출처 주소는 http:// 또는 https://로 시작하는 올바른 주소여야 합니다.")
             String sourceUrl,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
             @RequestParam(defaultValue = "20")

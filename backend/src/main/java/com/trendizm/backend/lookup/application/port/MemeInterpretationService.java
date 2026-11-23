@@ -11,7 +11,7 @@ public interface MemeInterpretationService {
     /**
      * 단어·출처로 의견을 쓴다. 같은 단어·출처의 문서가 없으면 이 의견과 함께 문서를 만든다(한 트랜잭션).
      * 문서는 상태와 관계없이 먼저 찾고, 숨김 상태면 MEME_NOT_FOUND.
-     * 정규화한 단어·주소가 칼럼 길이를 넘으면 MEME_WORD_TOO_LONG·MEME_SOURCE_URL_TOO_LONG,
+     * 정규화한 단어가 비면 MEME_WORD_BLANK, 단어·주소가 칼럼 길이를 넘으면 MEME_WORD_TOO_LONG·MEME_SOURCE_URL_TOO_LONG,
      * 같은 단어·출처로 동시에 문서가 만들어져 DB에서 막히면 MEME_ALREADY_EXISTS
      */
     MemeInterpretationResponse createInterpretation(CreateMemeInterpretationCommand command);

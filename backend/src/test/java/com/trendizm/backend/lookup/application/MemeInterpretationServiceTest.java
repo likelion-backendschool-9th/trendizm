@@ -154,6 +154,18 @@ class MemeInterpretationServiceTest {
     }
 
     @Test
+    @DisplayName("보이지 않는 문자만 있는 단어는 MEME_WORD_BLANK, 보이지 않는 문자가 섞인 단어는 같은 문서에 붙는다")
+    void 보이지_않는_문자_단어() {
+        assertThatThrownBy(() -> interpretationService.createInterpretation(command("\u200Bㅤ", TMI_SOURCE)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(MemeErrorCode.MEME_WORD_BLANK);
+
+        MemeInterpretationResponse created = interpretationService.createInterpretation(command("TMI\u200B", TMI_SOURCE));
+        assertThat(created.memeId()).isEqualTo(tmi.getId());
+    }
+
+    @Test
     @DisplayName("숨김 문서의 단어·출처로 쓰면 새 문서를 만들지 않고 MEME_NOT_FOUND")
     void 숨김_문서에_작성() {
         assertThatThrownBy(() -> interpretationService.createInterpretation(command("알숨김", HIDDEN_SOURCE)))

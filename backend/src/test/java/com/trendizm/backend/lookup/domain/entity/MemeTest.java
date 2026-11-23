@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.trendizm.backend.lookup.domain.enums.MemeStatus;
+import java.text.Normalizer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +36,17 @@ class MemeTest {
 
         assertThat(meme.getWord()).isEqualTo("tmi");
         assertThat(Meme.normalizeWord(" 알잘딱 깔센 ")).isEqualTo("알잘딱 깔센");
+    }
+
+    @Test
+    @DisplayName("눈으로 같아 보이는 단어는 같은 단어로 맞춘다 (보이지 않는 문자, 자모 분리형 한글, 전각 문자)")
+    void 보이지_않는_차이_정규화() {
+        assertThat(Meme.normalizeWord("TMI\u200B")).isEqualTo("tmi");
+        assertThat(Meme.normalizeWord("\uFEFFTM\nI")).isEqualTo("tmi");
+        assertThat(Meme.normalizeWord("ㅤTMIㅤ")).isEqualTo("tmi");
+        assertThat(Meme.normalizeWord(Normalizer.normalize("알잘딱깔센", Normalizer.Form.NFD))).isEqualTo("알잘딱깔센");
+        assertThat(Meme.normalizeWord("ＴＭＩ")).isEqualTo("tmi");
+        assertThat(Meme.normalizeWord("\u200B\u3164")).isEmpty();
     }
 
     @Test

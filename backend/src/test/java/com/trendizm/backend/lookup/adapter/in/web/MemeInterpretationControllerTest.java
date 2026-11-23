@@ -81,7 +81,7 @@ class MemeInterpretationControllerTest {
     void 잘못된_주소() throws Exception {
         for (String field : List.of("sourceUrl", "thumbnailUrl")) {
             for (String url : List.of("javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "ftp://example.com/a",
-                    "https://example.com/a b")) {
+                    "https://example.com/a b", "https://youtu.be/abc\u200B", "https://example.com/ㅤ")) {
                 mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
                                 .content(("{\"word\":\"TMI\",\"meaning\":\"뜻\",\"content\":\"내용\","
                                         + "\"sourceUrl\":\"https://example.com/1\",\"%s\":\"%s\"}")

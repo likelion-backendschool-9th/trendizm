@@ -46,6 +46,10 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
         String word = Meme.normalizeWord(command.word());
         // 요청 검증(100자)은 바꾸기 전 길이라, 소문자로 바꾸며 길어진 단어는 여기서 막는다.
         // 막지 않으면 DB 길이 오류가 아래 중복 처리(MEME_ALREADY_EXISTS)로 잘못 바뀐다
+        // @NotBlank는 폭 없는 공백 같은 보이지 않는 문자를 공백으로 보지 않아서, 지운 뒤에 다시 확인한다
+        if (word.isEmpty()) {
+            throw new BusinessException(MemeErrorCode.MEME_WORD_BLANK);
+        }
         if (word.length() > Meme.MAX_WORD_LENGTH) {
             throw new BusinessException(MemeErrorCode.MEME_WORD_TOO_LONG);
         }
