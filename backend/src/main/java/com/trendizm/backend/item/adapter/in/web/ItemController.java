@@ -137,4 +137,15 @@ public class ItemController {
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
+
+    /**
+     * 추천 아이템 잠금 해제 (100P). 열린 아이템(이름·판매처·가격·태그·설명·이미지·링크 포함)을 돌려준다.
+     * 이미 열람했거나 내가 등록한 아이템이면 포인트를 쓰지 않는다. 포인트가 부족하면 409 INSUFFICIENT_POINT_BALANCE
+     */
+    @PostMapping("/recommendations/{recommendationId}/unlock")
+    public ItemResponse unlockRecommendation(
+            @PathVariable Long recommendationId,
+            @AuthenticationPrincipal(expression = "id") Long userId) {
+        return itemService.unlockRecommendation(recommendationId, userId);
+    }
 }

@@ -9,6 +9,8 @@ public enum ItemErrorCode implements ErrorCode {
     /** 없거나 관리자가 숨긴 질문 글 */
     ITEM_QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "질문 글을 찾을 수 없습니다."),
     ITEM_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
+    /** 없거나 숨긴 질문 글의 추천 아이템 */
+    ITEM_RECOMMENDATION_NOT_FOUND(HttpStatus.NOT_FOUND, "추천 아이템을 찾을 수 없습니다."),
     /** 다른 글의 댓글이거나 대댓글에 답글을 달려고 한 경우 */
     ITEM_INVALID_PARENT_COMMENT(HttpStatus.BAD_REQUEST, "답글을 달 수 없는 댓글입니다."),
     /** 없는 카테고리 slug */

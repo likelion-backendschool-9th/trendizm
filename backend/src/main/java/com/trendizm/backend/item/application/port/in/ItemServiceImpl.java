@@ -17,12 +17,16 @@ import com.trendizm.backend.item.application.port.out.ItemCommentLikeRepository;
 import com.trendizm.backend.item.application.port.out.ItemCommentRepository;
 import com.trendizm.backend.item.application.port.out.ItemQuestionRepository;
 import com.trendizm.backend.item.application.port.out.ItemRepository;
+import com.trendizm.backend.item.application.port.out.ItemUnlockRepository;
 import com.trendizm.backend.item.domain.entity.Item;
 import com.trendizm.backend.item.domain.entity.ItemComment;
 import com.trendizm.backend.item.domain.entity.ItemQuestion;
+import com.trendizm.backend.item.domain.entity.ItemUnlock;
 import com.trendizm.backend.item.domain.enums.ItemQuestionStatus;
 import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.port.MemberService;
+import com.trendizm.backend.point.application.dto.UnlockPaymentCommand;
+import com.trendizm.backend.point.application.port.PointService;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -45,6 +49,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ItemServiceImpl implements ItemService {
 
+    /** 열람 가격 중 등록자에게 적립하는 비율(%). 지금은 전액 적립 (ERD item_unlocks 주석) */
+    static final int EARN_RATE_PERCENT = 100;
+
     /** 탈퇴했거나 찾을 수 없는 회원의 닉네임 자리에 보여 줄 이름 */
     static final String UNKNOWN_AUTHOR = "탈퇴한 회원";
 
@@ -52,7 +59,9 @@ public class ItemServiceImpl implements ItemService {
     private final ItemCommentRepository commentRepository;
     private final ItemCommentLikeRepository commentLikeRepository;
     private final ItemRepository itemRepository;
+    private final ItemUnlockRepository unlockRepository;
     private final MemberService memberService;
+    private final PointService pointService;
 
     @Override
     public PageResponse<ItemQuestionSummaryResponse> getQuestions(ItemQuestionQuery query) {
@@ -156,9 +165,38 @@ public class ItemServiceImpl implements ItemService {
         getPublicQuestion(questionId);
         List<Item> items = itemRepository.findByQuestionIdOrderByIdAsc(questionId);
         Map<Long, String> authors = nicknames(items.stream().map(Item::getUserId).toList());
+        Set<Long> unlocked = viewerId == null || items.isEmpty()
+                ? Set.of()
+                : new HashSet<>(unlockRepository.findUnlockedItemIds(viewerId, items.stream().map(Item::getId).toList()));
         return items.stream()
-                .map(item -> toResponse(item, authors.get(item.getUserId()), viewerId))
+                .map(item -> toResponse(item, authors.get(item.getUserId()), viewerId, unlocked.contains(item.getId())))
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public ItemResponse unlockRecommendation(Long recommendationId, Long userId) {
+        Item item = itemRepository.findById(recommendationId)
+                .filter(found -> isPublicQuestion(found.getQuestionId()))
+                .orElseThrow(() -> new BusinessException(ItemErrorCode.ITEM_RECOMMENDATION_NOT_FOUND));
+        String author = nickname(item.getUserId());
+
+        // 내가 등록한 아이템은 포인트 없이 처음부터 열려 있다 (팀 결정 11/18)
+        if (item.isOwnedBy(userId)) {
+            return toResponse(item, author, userId, false);
+        }
+
+        // 열람 기록을 없을 때만 넣는다. 0이면 이미 열람했거나, 같은 회원의 다른 요청이 먼저 결제를 끝낸 경우다
+        int price = item.getUnlockPrice();
+        boolean firstUnlock = unlockRepository.insertIfAbsent(item.getId(), userId, price) == 1;
+        if (firstUnlock) {
+            ItemUnlock unlock = unlockRepository.findByItemIdAndUserId(item.getId(), userId)
+                    .orElseThrow(() -> new IllegalStateException("저장한 열람 기록을 찾을 수 없습니다."));
+            // 포인트가 부족하면 예외가 나서 이 트랜잭션 전체(열람 기록 포함)가 롤백된다
+            pointService.payForUnlock(new UnlockPaymentCommand(userId, item.getUserId(), unlock.getId(), price,
+                    price * EARN_RATE_PERCENT / 100));
+        }
+        return toResponse(item, author, userId, true);
     }
 
     @Override
@@ -170,7 +208,7 @@ public class ItemServiceImpl implements ItemService {
         Item item = itemRepository.save(Item.create(command.questionId(), command.userId(), command.title(),
                 command.seller(), command.price(), command.tags(), command.description(),
                 command.imageUrl(), command.linkUrl()));
-        return toResponse(item, nickname(command.userId()), command.userId());
+        return toResponse(item, nickname(command.userId()), command.userId(), false);
     }
 
     private Page<ItemQuestion> findPublicQuestions(ItemQuestionQuery query, Pageable pageable) {
@@ -204,11 +242,11 @@ public class ItemServiceImpl implements ItemService {
                         itemRepository.countByQuestionId(question.getId()));
     }
 
-    /** 등록자 본인에게만 열린 상태로 보여 준다. 잠금 해제한 회원 처리는 잠금 해제 기능(PR ②)에서 추가한다 */
-    private ItemResponse toResponse(Item item, String authorNickname, Long viewerId) {
+    /** 등록자 본인과 열람한 회원에게만 열린 상태로 보여 준다 */
+    private ItemResponse toResponse(Item item, String authorNickname, Long viewerId, boolean unlocked) {
         boolean mine = item.isOwnedBy(viewerId);
         ItemResponse response = ItemResponse.from(item).withAuthor(authorNickname).withMine(mine);
-        return mine ? response : response.lock();
+        return mine || unlocked ? response : response.lock();
     }
 
     /** 댓글들을 응답으로 바꾸는 함수. 작성자 닉네임·공감 수·내가 공감했는지를 한 번에 조회해 둔다 */
