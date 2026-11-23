@@ -12,7 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - 클라이언트 컴포넌트에서는 `lib/api/client.ts`의 `apiFetch`, 서버 컴포넌트에서는 `lib/api/server.ts`의 `serverFetch`를 쓴다. `fetch`로 백엔드를 직접 부르지 않는다.
 - 주소는 백엔드 경로 그대로 쓴다. 예: `apiFetch<PageResponse<Feed>>("/api/feeds?page=0")`.
-- 인증은 BFF 방식이다. 브라우저의 `/api/**` 요청은 Next 서버의 `app/api/[...path]/route.ts`가 받아 백엔드(`BACKEND_URL`, 기본 `http://localhost:8080`)로 전달하고, `access_token` 쿠키를 `Authorization: Bearer` 헤더로 바꿔 붙인다. 로그인·가입·재발급은 `app/api/auth/*/route.ts`가 토큰을 쿠키로 저장하고 회원 정보(`LoginMember`)만 돌려준다. 공통 코드는 `lib/api/bff.ts`(서버 전용)에 있다.
+- 인증은 BFF 방식이다. 브라우저의 `/api/**` 요청은 Next 서버의 `app/api/[...path]/route.ts`가 받아 백엔드(`BACKEND_URL`, 기본 `http://localhost:8080`)로 전달하고, `access_token` 쿠키를 `Authorization: Bearer` 헤더로 바꿔 붙인다. 로그인·가입·재발급은 `app/api/auth/*/route.ts`가 토큰을 쿠키로 저장하고 회원 정보(`LoginMember`)만 돌려준다. 로그아웃(`/api/auth/logout`)은 리프레시 토큰을 폐기하고 두 쿠키를 지운다. 로그인한 회원 정보는 `apiFetch("/api/auth/me", { redirectOnUnauthorized: false })`로 확인한다(로그인 안 했으면 401). 공통 코드는 `lib/api/bff.ts`(서버 전용)에 있다.
 - 로그인 토큰은 HttpOnly 쿠키라서 자바스크립트로 읽거나 저장하지 않는다. `apiFetch`가 401을 받으면 토큰을 한 번 재발급하고 다시 요청하며, 그래도 실패하면 `/login?next=...`로 보낸다.
 - 실패하면 `ApiError`(`status`, `code`, `message`, `errors`)를 던진다. 입력칸 오류는 `error.fieldMessage("email")`로 꺼낸다. 서버에 닿지 못한 경우도 `ApiError`(`code` `NETWORK_ERROR`)다. Next 서버에 못 닿으면 `status` 0, Next 서버가 백엔드에 못 닿으면 `status` 502다.
 - `cacheComponents`가 켜져 있어서 서버 컴포넌트에서 `serverFetch`를 그냥 부르면 빌드가 실패한다. 공개 데이터든 로그인이 필요한 데이터(`withAuth: true`)든 지금은 그 컴포넌트를 `<Suspense>`로 감싼다.
