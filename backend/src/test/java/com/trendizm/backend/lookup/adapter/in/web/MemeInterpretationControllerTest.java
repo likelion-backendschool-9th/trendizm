@@ -3,8 +3,10 @@ package com.trendizm.backend.lookup.adapter.in.web;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,8 +17,10 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
+import com.trendizm.backend.lookup.application.dto.VoteMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
 import com.trendizm.backend.lookup.application.port.MemeInterpretationService;
+import com.trendizm.backend.lookup.domain.enums.MemeVoteType;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -35,8 +39,9 @@ class MemeInterpretationControllerTest {
     private static final CustomUserDetails LOGIN_USER = new CustomUserDetails(7L, "member@test.com", "encoded", List.of());
     private static final String CREATE = "/api/lookup/interpretations";
     private static final String LIST = "/api/lookup/memes/{memeId}/interpretations";
+    private static final String VOTE = "/api/lookup/interpretations/{interpretationId}/vote";
     private static final MemeInterpretationResponse INTERPRETATION = new MemeInterpretationResponse(
-            1L, 3L, 7L, "밈장인", "알아서 잘 딱 깔끔하고 센스 있게", "내용", 0, 0, LocalDateTime.now(), LocalDateTime.now());
+            1L, 3L, 7L, "밈장인", "알아서 잘 딱 깔끔하고 센스 있게", "내용", 0, 0, null, LocalDateTime.now(), LocalDateTime.now());
 
     @Autowired
     private MockMvc mockMvc;
@@ -142,9 +147,9 @@ class MemeInterpretationControllerTest {
     }
 
     @Test
-    @DisplayName("의견 목록은 로그인 없이 볼 수 있다")
+    @DisplayName("의견 목록은 로그인 없이 볼 수 있다 (viewerId는 null)")
     void 목록() throws Exception {
-        given(interpretationService.getInterpretations(3L, 0, 20))
+        given(interpretationService.getInterpretations(3L, null, 0, 20))
                 .willReturn(new PageResponse<>(List.of(INTERPRETATION), 0, 20, 1, 1, false));
 
         mockMvc.perform(get(LIST, 3L))
@@ -156,11 +161,64 @@ class MemeInterpretationControllerTest {
     @Test
     @DisplayName("없는 문서의 의견 목록은 404 MEME_NOT_FOUND")
     void 없는_문서_목록() throws Exception {
-        given(interpretationService.getInterpretations(99L, 0, 20))
+        given(interpretationService.getInterpretations(99L, null, 0, 20))
                 .willThrow(new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
 
         mockMvc.perform(get(LIST, 99L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("MEME_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("로그인하고 목록을 보면 viewerId를 넘긴다 (myVote 표시용)")
+    void 로그인_목록() throws Exception {
+        given(interpretationService.getInterpretations(3L, 7L, 0, 20))
+                .willReturn(new PageResponse<>(List.of(INTERPRETATION.withMyVote("agree")), 0, 20, 1, 1, false));
+
+        mockMvc.perform(get(LIST, 3L).with(user(LOGIN_USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].myVote").value("agree"));
+    }
+
+    @Test
+    @DisplayName("로그인하면 투표할 수 있다. 종류는 대소문자를 무시한다")
+    void 투표() throws Exception {
+        given(interpretationService.vote(new VoteMemeInterpretationCommand(1L, 7L, MemeVoteType.DISAGREE)))
+                .willReturn(INTERPRETATION.withMyVote("disagree"));
+
+        mockMvc.perform(put(VOTE, 1L).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"Disagree\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.myVote").value("disagree"));
+    }
+
+    @Test
+    @DisplayName("투표 종류가 agree·disagree가 아니면 400 MEME_INVALID_VOTE_TYPE")
+    void 잘못된_투표_종류() throws Exception {
+        mockMvc.perform(put(VOTE, 1L).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"like\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MEME_INVALID_VOTE_TYPE"));
+        verifyNoInteractions(interpretationService);
+    }
+
+    @Test
+    @DisplayName("로그인하면 투표를 취소할 수 있다")
+    void 투표_취소() throws Exception {
+        given(interpretationService.cancelVote(1L, 7L)).willReturn(INTERPRETATION);
+
+        mockMvc.perform(delete(VOTE, 1L).with(user(LOGIN_USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.myVote").isEmpty());
+    }
+
+    @Test
+    @DisplayName("로그인하지 않으면 투표·취소할 수 없다 (401)")
+    void 비로그인_투표() throws Exception {
+        mockMvc.perform(put(VOTE, 1L).contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"agree\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(delete(VOTE, 1L))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(interpretationService);
     }
 }

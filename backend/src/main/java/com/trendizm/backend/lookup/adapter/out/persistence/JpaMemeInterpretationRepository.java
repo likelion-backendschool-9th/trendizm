@@ -5,6 +5,7 @@ import com.trendizm.backend.lookup.domain.entity.MemeInterpretation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -20,4 +21,15 @@ public interface JpaMemeInterpretationRepository
             order by (i.agreeCount - i.disagreeCount) desc, i.createdAt desc, i.id desc
             """)
     Page<MemeInterpretation> findByMemeIdOrderByTrust(@Param("memeId") Long memeId, Pageable pageable);
+
+    /** 영속성 컨텍스트를 비워서, 이후 findById가 DB에서 바뀐 수를 다시 읽게 한다 */
+    @Override
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update MemeInterpretation i
+            set i.agreeCount = i.agreeCount + :agreeDelta, i.disagreeCount = i.disagreeCount + :disagreeDelta
+            where i.id = :id
+            """)
+    void addVoteCounts(@Param("id") Long id, @Param("agreeDelta") int agreeDelta,
+                       @Param("disagreeDelta") int disagreeDelta);
 }

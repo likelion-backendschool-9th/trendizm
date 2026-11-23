@@ -182,7 +182,7 @@ class MemeInterpretationServiceTest {
         MemeInterpretation newer = saveWithVotes("나중 쓴 1점", 1, 0); // 1
         MemeInterpretation top = saveWithVotes("찬성 많음", 5, 0);   // 5
 
-        PageResponse<MemeInterpretationResponse> page = interpretationService.getInterpretations(tmi.getId(), 0, 20);
+        PageResponse<MemeInterpretationResponse> page = interpretationService.getInterpretations(tmi.getId(), null, 0, 20);
 
         assertThat(page.content()).extracting(MemeInterpretationResponse::id)
                 .containsExactly(top.getId(), newer.getId(), older.getId(), low.getId());
@@ -195,7 +195,7 @@ class MemeInterpretationServiceTest {
         saveWithVotes(reader, "TMI러 의견", 1, 0);
         saveWithVotes(UNKNOWN_USER, "탈퇴 회원 의견", 0, 0);
 
-        PageResponse<MemeInterpretationResponse> page = interpretationService.getInterpretations(tmi.getId(), 0, 20);
+        PageResponse<MemeInterpretationResponse> page = interpretationService.getInterpretations(tmi.getId(), null, 0, 20);
 
         assertThat(page.content()).extracting(MemeInterpretationResponse::authorNickname)
                 .containsExactly("밈장인", "TMI러", "탈퇴한 회원");
@@ -208,7 +208,7 @@ class MemeInterpretationServiceTest {
             saveWithVotes("뜻" + i, 0, 0);
         }
 
-        PageResponse<MemeInterpretationResponse> page = interpretationService.getInterpretations(tmi.getId(), 1, 2);
+        PageResponse<MemeInterpretationResponse> page = interpretationService.getInterpretations(tmi.getId(), null, 1, 2);
 
         assertThat(page.content()).hasSize(1);
         assertThat(page.totalElements()).isEqualTo(3);
@@ -219,7 +219,7 @@ class MemeInterpretationServiceTest {
     @DisplayName("없거나 숨김인 문서의 의견 목록은 MEME_NOT_FOUND")
     void 없는_문서_목록() {
         for (Long memeId : new Long[] {-1L, hidden.getId()}) {
-            assertThatThrownBy(() -> interpretationService.getInterpretations(memeId, 0, 20))
+            assertThatThrownBy(() -> interpretationService.getInterpretations(memeId, null, 0, 20))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(MemeErrorCode.MEME_NOT_FOUND);

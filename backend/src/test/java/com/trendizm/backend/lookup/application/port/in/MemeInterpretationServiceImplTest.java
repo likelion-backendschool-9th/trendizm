@@ -10,6 +10,7 @@ import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
 import com.trendizm.backend.lookup.application.port.out.MemeInterpretationRepository;
+import com.trendizm.backend.lookup.application.port.out.MemeInterpretationVoteRepository;
 import com.trendizm.backend.lookup.application.port.out.MemeRepository;
 import com.trendizm.backend.lookup.domain.entity.Meme;
 import com.trendizm.backend.member.application.port.MemberService;
@@ -23,9 +24,10 @@ class MemeInterpretationServiceImplTest {
 
     private final MemeRepository memeRepository = mock(MemeRepository.class);
     private final MemeInterpretationRepository interpretationRepository = mock(MemeInterpretationRepository.class);
+    private final MemeInterpretationVoteRepository voteRepository = mock(MemeInterpretationVoteRepository.class);
     private final MemberService memberService = mock(MemberService.class);
     private final MemeInterpretationServiceImpl service =
-            new MemeInterpretationServiceImpl(memeRepository, interpretationRepository, memberService);
+            new MemeInterpretationServiceImpl(memeRepository, interpretationRepository, voteRepository, memberService);
 
     @Test
     @DisplayName("조회와 저장 사이에 다른 요청이 같은 단어·출처로 문서를 만들면 409 MEME_ALREADY_EXISTS")
