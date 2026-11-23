@@ -1,24 +1,102 @@
+"use client";
+
 import Link from "next/link";
+import { useState, type FormEvent } from "react";
+import { apiFetch } from "@/lib/api/client";
+import { ApiError, type LoginMember } from "@/lib/api/types";
+import { sameOriginUrl } from "@/lib/safeRedirect";
 
 // 와이어프레임: 로그인 (login)
 // 오류 상태: 필수값 또는 이메일 형식 오류는 해당 입력 필드 아래에 표시한다.
+// 로그인에 실패하면(이메일·비밀번호 불일치, 이용 제한 등) 폼 위에 표시한다.
 
-const FIELDS = [
+type FieldName = "email" | "password";
+type Errors = Partial<Record<FieldName | "form", string>>;
+
+const FIELDS: { name: FieldName; type: string; label: string; placeholder: string; autoComplete: string }[] = [
   {
     name: "email",
     type: "email",
     label: "이메일",
     placeholder: "이메일 주소를 입력하세요",
+    autoComplete: "email",
   },
   {
     name: "password",
     type: "password",
     label: "비밀번호",
     placeholder: "비밀번호를 입력하세요",
+    autoComplete: "current-password",
   },
 ];
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * 로그인 후 돌아갈 주소. 같은 사이트 안의 주소만 쓴다(열린 리다이렉트 방지, lib/safeRedirect.ts).
+ * useSearchParams 대신 제출 순간에 주소창을 읽는다. 훅을 쓰면 운영 빌드에서 Suspense가 필요하다.
+ */
+function nextPath(): string {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return sameOriginUrl(next, window.location.origin);
+}
+
+/** 서버에 보내기 전에 입력칸을 검사한다. 메시지는 백엔드 검증 메시지와 같게 둔다 */
+function validate(email: string, password: string): Errors {
+  const errors: Errors = {};
+  if (!email) {
+    errors.email = "이메일을 입력해 주세요.";
+  } else if (!EMAIL_PATTERN.test(email)) {
+    errors.email = "이메일 형식이 아닙니다.";
+  }
+  if (!password) {
+    errors.password = "비밀번호를 입력해 주세요.";
+  }
+  return errors;
+}
+
 export default function LoginPage() {
+  const [errors, setErrors] = useState<Errors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    const rememberMe = form.get("remember") === "on";
+
+    const found = validate(email, password);
+    setErrors(found);
+    if (Object.keys(found).length > 0) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await apiFetch<LoginMember>("/api/auth/login", {
+        method: "POST",
+        body: { email, password, rememberMe },
+      });
+      // 헤더 등 화면 전체가 로그인 상태로 다시 그려지도록 전체 이동한다
+      window.location.assign(nextPath());
+    } catch (error) {
+      setSubmitting(false);
+      if (error instanceof ApiError) {
+        const emailError = error.fieldMessage("email");
+        const passwordError = error.fieldMessage("password");
+        setErrors(
+          emailError || passwordError ? { email: emailError, password: passwordError } : { form: error.message },
+        );
+      } else {
+        setErrors({ form: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요." });
+      }
+    }
+  }
+
   return (
     <main
       style={{
@@ -38,43 +116,62 @@ export default function LoginPage() {
         계정으로 들어가 관심 있는 트렌드를 이어서 확인하세요.
       </p>
 
-      {/* TODO: 로그인 요청 연결 */}
+      {/* 브라우저 기본 말풍선 대신 입력칸 아래에 오류를 띄우려고 noValidate를 쓴다 */}
       <form
+        noValidate
+        onSubmit={handleSubmit}
         style={{
           marginTop: 36,
           padding: "30px 32px 32px",
           border: "1px solid #ccc",
         }}
       >
+        {errors.form && (
+          <p role="alert" style={{ marginBottom: 22, fontSize: 13, color: "#c62828" }}>
+            {errors.form}
+          </p>
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-          {FIELDS.map((field) => (
-            <label
-              key={field.name}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                fontSize: 15,
-                fontWeight: 700,
-              }}
-            >
-              {field.label}
-              <input
-                type={field.type}
-                name={field.name}
-                placeholder={field.placeholder}
-                required
+          {FIELDS.map((field) => {
+            const error = errors[field.name];
+            const errorId = `${field.name}-error`;
+            return (
+              <label
+                key={field.name}
                 style={{
-                  height: 52,
-                  padding: "0 16px",
-                  border: "1px solid #ccc",
-                  borderRadius: 3,
-                  fontSize: 14,
-                  fontWeight: 400,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  fontSize: 15,
+                  fontWeight: 700,
                 }}
-              />
-            </label>
-          ))}
+              >
+                {field.label}
+                <input
+                  type={field.type}
+                  name={field.name}
+                  placeholder={field.placeholder}
+                  autoComplete={field.autoComplete}
+                  required
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? errorId : undefined}
+                  style={{
+                    height: 52,
+                    padding: "0 16px",
+                    border: `1px solid ${error ? "#c62828" : "#ccc"}`,
+                    borderRadius: 3,
+                    fontSize: 14,
+                    fontWeight: 400,
+                  }}
+                />
+                {error && (
+                  <span id={errorId} style={{ fontSize: 12, fontWeight: 400, color: "#c62828" }}>
+                    {error}
+                  </span>
+                )}
+              </label>
+            );
+          })}
         </div>
 
         <div
@@ -100,6 +197,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
+          disabled={submitting}
           style={{
             width: "100%",
             height: 52,
@@ -109,10 +207,11 @@ export default function LoginPage() {
             color: "#fff",
             fontSize: 15,
             fontWeight: 700,
-            cursor: "pointer",
+            cursor: submitting ? "default" : "pointer",
+            opacity: submitting ? 0.6 : 1,
           }}
         >
-          로그인
+          {submitting ? "로그인 중…" : "로그인"}
         </button>
       </form>
 

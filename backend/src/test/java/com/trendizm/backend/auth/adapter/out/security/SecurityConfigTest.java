@@ -49,7 +49,7 @@ class SecurityConfigTest {
             "/api/notifications", false,
             "/api/points", false);
 
-    /** 가입·로그인·재발급은 로그인 전에 POST로 부르므로 쓰기 검사에서 뺀다 */
+    /** 가입·로그인·재발급·로그아웃은 로그인 전에 POST로 부르므로 쓰기 검사에서 뺀다 */
     private static final String AUTH = "/api/auth";
 
     private static final List<HttpMethod> WRITE_METHODS =
@@ -123,5 +123,12 @@ class SecurityConfigTest {
                 }
             }
         }
+    }
+
+    @Test
+    @DisplayName("/api/auth는 공개지만 GET /api/auth/me만은 로그인을 요구한다")
+    void 내_정보는_로그인을_요구한다() throws Exception {
+        int status = mockMvc.perform(get(AUTH + "/me")).andReturn().getResponse().getStatus();
+        assertThat(status).as("GET /api/auth/me는 로그인 없이 막혀야 하는데 %d 응답", status).isEqualTo(401);
     }
 }

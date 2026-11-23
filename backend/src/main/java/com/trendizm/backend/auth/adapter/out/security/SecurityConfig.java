@@ -23,7 +23,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * 이 서버는 브라우저가 아니라 Next 서버(BFF, frontend/app/api)만 호출하므로 CORS 설정이 필요 없다.
  *
  * 접근 규칙(위에서부터 먼저 맞는 규칙이 적용된다):
- * 1. /api/auth/** (가입·로그인·재발급) → 누구나
+ * 1. /api/auth/** (가입·로그인·재발급·로그아웃) → 누구나. 단 GET /api/auth/me는 로그인 필요
  * 2. feed·item·lookup·ranking·rating 조회(GET) → 누구나. 쓰기(POST·PUT·PATCH·DELETE)는 로그인 필요
  * 3. /api/admin/** → ADMIN만
  * 4. 그 외(notification, members 등) → 로그인 필요
@@ -57,6 +57,8 @@ public class SecurityConfig {
                         .accessDeniedHandler(securityErrorHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error").permitAll()
+                        // permitAll보다 먼저 둔다. 순서가 바뀌면 로그인 없이 열린다
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers("/api/auth/**").permitAll()
                         // 공개 경로는 조회만 허용한다. 메서드를 빼면 비로그인 쓰기·삭제까지 열린다
                         .requestMatchers(HttpMethod.GET,

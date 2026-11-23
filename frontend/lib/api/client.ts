@@ -37,9 +37,12 @@ function reissueOnce(): Promise<number> {
   return reissuing;
 }
 
-/** 로그인·가입·재발급 요청은 401을 받아도 재발급을 시도하지 않는다 */
+/** 로그인 회원 정보. /api/auth 아래지만 액세스 토큰이 필요해서 401이면 재발급을 시도한다 */
+const ME_PATH = "/api/auth/me";
+
+/** 로그인·가입·재발급·로그아웃 요청은 401을 받아도 재발급을 시도하지 않는다 */
 function isAuthRequest(path: string): boolean {
-  return path.startsWith("/api/auth/");
+  return path.startsWith("/api/auth/") && path !== ME_PATH;
 }
 
 function goToLogin() {

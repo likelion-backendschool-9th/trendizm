@@ -10,6 +10,7 @@ import com.trendizm.backend.auth.application.port.out.RefreshTokenStore;
 import com.trendizm.backend.auth.application.port.out.TokenProvider;
 import com.trendizm.backend.auth.config.JwtProperties;
 import com.trendizm.backend.global.error.BusinessException;
+import com.trendizm.backend.global.error.CommonErrorCode;
 import com.trendizm.backend.member.application.dto.MemberCredentials;
 import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.dto.RegisterMemberCommand;
@@ -99,6 +100,31 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(AuthErrorCode.MEMBER_SUSPENDED);
         }
         return issueTokens(member, entry.rememberMe());
+    }
+
+    @Override
+    public void logout(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+        refreshTokenStore.revoke(refreshToken);
+    }
+
+    @Override
+    public LoginMember me(Long memberId) {
+        MemberInfo member;
+        try {
+            member = memberService.getMember(memberId);
+        } catch (BusinessException e) {
+            throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
+        }
+        if (member.withdrawn()) {
+            throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
+        }
+        if (member.suspended()) {
+            throw new BusinessException(AuthErrorCode.MEMBER_SUSPENDED);
+        }
+        return new LoginMember(member.id(), member.nickname(), member.role());
     }
 
     private LoginResponse issueTokens(MemberInfo member, boolean rememberMe) {

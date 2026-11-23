@@ -1,6 +1,7 @@
 package com.trendizm.backend.auth.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -261,5 +262,94 @@ class AuthLoginTest {
         reissue(refresh)
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    }
+
+    private ResultActions logout(String body) throws Exception {
+        return mockMvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private ResultActions me(String accessToken) throws Exception {
+        return mockMvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, bearer(accessToken)));
+    }
+
+    private Long memberId(String email) {
+        return memberRepository.findByEmail(email).orElseThrow().getId();
+    }
+
+    @Test
+    @DisplayName("로그아웃하면 204이고, 그 리프레시 토큰으로는 더 재발급할 수 없다")
+    void 로그아웃() throws Exception {
+        String refresh = read(login("login@test.com", PASSWORD, true), "$.refreshToken");
+
+        logout("""
+                {"refreshToken": "%s"}
+                """.formatted(refresh))
+                .andExpect(status().isNoContent());
+
+        reissue(refresh)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    }
+
+    @Test
+    @DisplayName("로그아웃은 다른 기기의 리프레시 토큰을 건드리지 않는다")
+    void 로그아웃_다른_기기_유지() throws Exception {
+        String thisDevice = read(login("login@test.com", PASSWORD, true), "$.refreshToken");
+        String otherDevice = read(login("login@test.com", PASSWORD, true), "$.refreshToken");
+
+        logout("""
+                {"refreshToken": "%s"}
+                """.formatted(thisDevice))
+                .andExpect(status().isNoContent());
+
+        reissue(otherDevice).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("토큰 없이, 빈 값으로, 없는 토큰으로 로그아웃해도 204")
+    void 로그아웃_토큰_없음() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")).andExpect(status().isNoContent());
+        logout("{}").andExpect(status().isNoContent());
+        logout("""
+                {"refreshToken": ""}
+                """).andExpect(status().isNoContent());
+        logout("""
+                {"refreshToken": "no-such-token"}
+                """).andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("내 정보: 로그인한 회원의 id·닉네임·권한을 주고, 브라우저가 캐시하지 않게 한다")
+    void 내_정보() throws Exception {
+        String accessToken = read(login("login@test.com", PASSWORD, false), "$.accessToken");
+
+        me(accessToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(memberId("login@test.com")))
+                .andExpect(jsonPath("$.nickname").value("로그인회원"))
+                .andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")));
+    }
+
+    @Test
+    @DisplayName("내 정보: 로그인하지 않았으면 401 UNAUTHORIZED")
+    void 내_정보_비로그인() throws Exception {
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("내 정보: 토큰은 맞지만 회원이 없거나 탈퇴했으면 401, 이용 제한이면 403")
+    void 내_정보_회원_상태() throws Exception {
+        me(tokenProvider.createAccessToken(999_999L, "USER"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        me(tokenProvider.createAccessToken(memberId("withdrawn@test.com"), "USER"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        me(tokenProvider.createAccessToken(memberId("suspended@test.com"), "USER"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEMBER_SUSPENDED"));
     }
 }
