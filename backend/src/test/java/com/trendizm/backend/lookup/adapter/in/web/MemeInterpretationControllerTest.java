@@ -12,6 +12,7 @@ import com.trendizm.backend.auth.adapter.out.security.CustomUserDetails;
 import com.trendizm.backend.auth.adapter.out.security.SecurityConfig;
 import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
+import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
@@ -61,10 +62,13 @@ class MemeInterpretationControllerTest {
     }
 
     @Test
-    @DisplayName("단어나 뜻이 비어 있으면 400 INVALID_INPUT")
+    @DisplayName("단어·뜻·출처 주소가 비어 있으면 400 INVALID_INPUT")
     void 필수값_누락() throws Exception {
-        for (String body : List.of("{\"word\":\" \",\"meaning\":\"뜻\",\"content\":\"내용\"}",
-                "{\"word\":\"TMI\",\"meaning\":\" \",\"content\":\"내용\"}")) {
+        for (String body : List.of(
+                "{\"word\":\" \",\"meaning\":\"뜻\",\"content\":\"내용\",\"sourceUrl\":\"https://example.com/1\"}",
+                "{\"word\":\"TMI\",\"meaning\":\" \",\"content\":\"내용\",\"sourceUrl\":\"https://example.com/1\"}",
+                "{\"word\":\"TMI\",\"meaning\":\"뜻\",\"content\":\"내용\"}",
+                "{\"word\":\"TMI\",\"meaning\":\"뜻\",\"content\":\"내용\",\"sourceUrl\":\" \"}")) {
             mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
@@ -79,7 +83,8 @@ class MemeInterpretationControllerTest {
             for (String url : List.of("javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "ftp://example.com/a",
                     "https://example.com/a b")) {
                 mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"word\":\"TMI\",\"meaning\":\"뜻\",\"content\":\"내용\",\"%s\":\"%s\"}"
+                                .content(("{\"word\":\"TMI\",\"meaning\":\"뜻\",\"content\":\"내용\","
+                                        + "\"sourceUrl\":\"https://example.com/1\",\"%s\":\"%s\"}")
                                         .formatted(field, url)))
                         .andExpect(status().isBadRequest())
                         .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
@@ -105,10 +110,26 @@ class MemeInterpretationControllerTest {
     @DisplayName("단어가 100자를 넘으면 400 INVALID_INPUT")
     void 긴_단어() throws Exception {
         mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"word\":\"" + "가".repeat(101) + "\",\"meaning\":\"뜻\",\"content\":\"내용\"}"))
+                        .content("{\"word\":\"" + "가".repeat(101)
+                                + "\",\"meaning\":\"뜻\",\"content\":\"내용\",\"sourceUrl\":\"https://example.com/1\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
         verifyNoInteractions(interpretationService);
+    }
+
+    @Test
+    @DisplayName("목록에서 고른 문서에 의견을 쓴다")
+    void 고른_문서에_작성() throws Exception {
+        given(interpretationService.addInterpretation(new AddMemeInterpretationCommand(3L, 7L, "뜻", "내용")))
+                .willReturn(INTERPRETATION);
+
+        mockMvc.perform(post(LIST, 3L).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"meaning\":\" 뜻 \",\"content\":\"내용\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.memeId").value(3));
+        mockMvc.perform(post(LIST, 3L).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"meaning\":\"뜻\",\"content\":\"내용\"}"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

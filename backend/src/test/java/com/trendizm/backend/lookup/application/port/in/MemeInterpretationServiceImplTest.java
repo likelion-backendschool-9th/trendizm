@@ -28,13 +28,13 @@ class MemeInterpretationServiceImplTest {
             new MemeInterpretationServiceImpl(memeRepository, interpretationRepository, memberService);
 
     @Test
-    @DisplayName("조회와 저장 사이에 다른 요청이 같은 단어로 문서를 만들면 409 MEME_ALREADY_EXISTS")
+    @DisplayName("조회와 저장 사이에 다른 요청이 같은 단어·출처로 문서를 만들면 409 MEME_ALREADY_EXISTS")
     void 동시_문서_생성() {
-        given(memeRepository.findByWord("알잘딱깔센")).willReturn(Optional.empty());
+        given(memeRepository.findByWordAndSourceUrl("알잘딱깔센", "https://example.com/1")).willReturn(Optional.empty());
         given(memeRepository.saveAndFlush(any(Meme.class))).willThrow(new DataIntegrityViolationException("uk_memes_word"));
 
         assertThatThrownBy(() -> service.createInterpretation(
-                new CreateMemeInterpretationCommand("알잘딱깔센", 2L, "뜻", "내용", null, null, null)))
+                new CreateMemeInterpretationCommand("알잘딱깔센", 2L, "뜻", "내용", "https://example.com/1", null, null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(MemeErrorCode.MEME_ALREADY_EXISTS);

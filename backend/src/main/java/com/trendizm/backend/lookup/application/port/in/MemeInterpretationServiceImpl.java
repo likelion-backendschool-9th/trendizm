@@ -2,6 +2,7 @@ package com.trendizm.backend.lookup.application.port.in;
 
 import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
+import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
@@ -10,6 +11,7 @@ import com.trendizm.backend.lookup.application.port.out.MemeInterpretationReposi
 import com.trendizm.backend.lookup.application.port.out.MemeRepository;
 import com.trendizm.backend.lookup.domain.entity.Meme;
 import com.trendizm.backend.lookup.domain.entity.MemeInterpretation;
+import com.trendizm.backend.lookup.domain.vo.SourceUrl;
 import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.port.MemberService;
 import java.util.Collection;
@@ -47,22 +49,38 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
         if (word.length() > Meme.MAX_WORD_LENGTH) {
             throw new BusinessException(MemeErrorCode.MEME_WORD_TOO_LONG);
         }
-        // 숨김 문서도 찾아야 한다. 공개 문서만 찾으면 숨김 단어를 새로 저장하려다 word UNIQUE 위반이 난다
-        Meme meme = memeRepository.findByWord(word)
+        String sourceUrl = SourceUrl.normalize(command.sourceUrl());
+        if (sourceUrl.length() > Meme.MAX_SOURCE_URL_LENGTH) {
+            throw new BusinessException(MemeErrorCode.MEME_SOURCE_URL_TOO_LONG);
+        }
+        // 숨김 문서도 찾아야 한다. 공개 문서만 찾으면 숨김 문서를 새로 저장하려다 (word, source_url) UNIQUE 위반이 난다
+        Meme meme = memeRepository.findByWordAndSourceUrl(word, sourceUrl)
                 .orElseGet(() -> createMeme(command));
         if (meme.isHidden()) {
             throw new BusinessException(MemeErrorCode.MEME_NOT_FOUND);
         }
-        MemeInterpretation interpretation = interpretationRepository.save(MemeInterpretation.create(
-                meme.getId(), command.userId(), command.meaning(), command.content()));
-        return MemeInterpretationResponse.from(interpretation)
-                .withAuthor(nicknames(Set.of(command.userId())).get(command.userId()));
+        return saveInterpretation(meme.getId(), command.userId(), command.meaning(), command.content());
+    }
+
+    @Override
+    @Transactional
+    public MemeInterpretationResponse addInterpretation(AddMemeInterpretationCommand command) {
+        Meme meme = memeRepository.findById(command.memeId())
+                .filter(found -> !found.isHidden())
+                .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
+        return saveInterpretation(meme.getId(), command.userId(), command.meaning(), command.content());
+    }
+
+    private MemeInterpretationResponse saveInterpretation(Long memeId, Long userId, String meaning, String content) {
+        MemeInterpretation interpretation =
+                interpretationRepository.save(MemeInterpretation.create(memeId, userId, meaning, content));
+        return MemeInterpretationResponse.from(interpretation).withAuthor(nicknames(Set.of(userId)).get(userId));
     }
 
     private Meme createMeme(CreateMemeInterpretationCommand command) {
         Meme meme = Meme.create(command.word(), command.userId(), command.sourceUrl(), command.title(), command.thumbnailUrl());
         try {
-            // 위 조회와 저장 사이에 다른 요청이 같은 단어로 문서를 만들면 DB word UNIQUE에서 막힌다
+            // 위 조회와 저장 사이에 다른 요청이 같은 단어·출처로 문서를 만들면 DB (word, source_url) UNIQUE에서 막힌다
             return memeRepository.saveAndFlush(meme);
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(MemeErrorCode.MEME_ALREADY_EXISTS);

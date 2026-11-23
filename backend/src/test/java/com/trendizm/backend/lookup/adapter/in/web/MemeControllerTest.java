@@ -37,22 +37,33 @@ class MemeControllerTest {
     private MemeService memeService;
 
     @Test
-    @DisplayName("로그인 없이 q로 단어가 같은 문서를 조회한다")
-    void 단어로_조회() throws Exception {
-        given(memeService.getMeme("알잘딱깔센")).willReturn(MEME);
+    @DisplayName("로그인 없이 q로 단어가 같은 문서 목록(출처별)을 조회한다")
+    void 단어로_목록() throws Exception {
+        given(memeService.getMemesByWord("알잘딱깔센", 0, 20))
+                .willReturn(new PageResponse<>(List.of(MEME), 0, 20, 1, 1, false));
 
         mockMvc.perform(get("/api/lookup/memes").param("q", "알잘딱깔센"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.word").value("알잘딱깔센"))
+                .andExpect(jsonPath("$.content[0].word").value("알잘딱깔센"))
+                .andExpect(jsonPath("$.content[0].sourceUrl").value("https://video.example.com/watch/01"));
+    }
+
+    @Test
+    @DisplayName("목록에서 고른 문서를 id로 조회한다")
+    void 문서_조회() throws Exception {
+        given(memeService.getMeme(1L)).willReturn(MEME);
+
+        mockMvc.perform(get("/api/lookup/memes/{memeId}", 1L))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("영상 제목"));
     }
 
     @Test
-    @DisplayName("없는 단어는 404 MEME_NOT_FOUND")
-    void 없는_단어() throws Exception {
-        given(memeService.getMeme("없는단어")).willThrow(new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
+    @DisplayName("없는 문서는 404 MEME_NOT_FOUND")
+    void 없는_문서() throws Exception {
+        given(memeService.getMeme(99L)).willThrow(new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
 
-        mockMvc.perform(get("/api/lookup/memes").param("q", "없는단어"))
+        mockMvc.perform(get("/api/lookup/memes/{memeId}", 99L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("MEME_NOT_FOUND"));
     }
@@ -60,7 +71,8 @@ class MemeControllerTest {
     @Test
     @DisplayName("'/'나 '%'가 들어간 단어도 q로 조회할 수 있다")
     void 특수문자_단어() throws Exception {
-        given(memeService.getMeme("50%/할인")).willReturn(MEME);
+        given(memeService.getMemesByWord("50%/할인", 0, 20))
+                .willReturn(new PageResponse<>(List.of(MEME), 0, 20, 1, 1, false));
 
         mockMvc.perform(get("/api/lookup/memes").param("q", "50%/할인"))
                 .andExpect(status().isOk());

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
+import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
 import com.trendizm.backend.lookup.application.dto.MemeResponse;
@@ -52,27 +53,35 @@ class MemeInterpretationServiceTest {
     private Meme tmi;
     private Meme hidden;
 
+    /** 공개 문서 tmi와 숨김 문서 알숨김의 출처. 의견 작성 command도 TMI_SOURCE를 쓴다 */
+    private static final String TMI_SOURCE = "https://youtu.be/tmi01";
+    private static final String HIDDEN_SOURCE = "https://example.com/hidden";
+
     /** 회원 2명, 공개 문서 tmi(의견 없음), 숨김 문서 알숨김. 테스트가 끝나면 롤백된다 */
     @BeforeEach
     void setUp() {
         writer = memberService.register(new RegisterMemberCommand("writer@test.com", "encoded", "밈장인", false));
         reader = memberService.register(new RegisterMemberCommand("reader@test.com", "encoded", "TMI러", false));
-        tmi = memeRepository.save(Meme.create("TMI", 1L, null, null, null));
-        hidden = Meme.create("알숨김", 1L, null, null, null);
+        tmi = memeRepository.save(Meme.create("TMI", 1L, TMI_SOURCE, null, null));
+        hidden = Meme.create("알숨김", 1L, HIDDEN_SOURCE, null, null);
         hidden.hide();
         memeRepository.save(hidden);
     }
 
+    private CreateMemeInterpretationCommand command(String word, String sourceUrl) {
+        return new CreateMemeInterpretationCommand(word, writer, "뜻", "내용", sourceUrl, "영상 제목", null);
+    }
+
     private CreateMemeInterpretationCommand command(String word) {
-        return new CreateMemeInterpretationCommand(word, writer, "뜻", "내용", "https://video.example.com/watch/01", "영상 제목", null);
+        return command(word, "https://video.example.com/watch/01");
     }
 
     @Test
-    @DisplayName("문서가 없는 단어에 첫 의견을 쓰면 문서가 함께 만들어지고, 출처는 문서에 저장된다")
+    @DisplayName("문서가 없는 단어·출처로 첫 의견을 쓰면 문서가 함께 만들어지고, 출처는 문서에 저장된다")
     void 첫_의견으로_문서_생성() {
         MemeInterpretationResponse created = interpretationService.createInterpretation(command(" 알잘딱깔센 "));
 
-        MemeResponse meme = memeService.getMeme("알잘딱깔센");
+        MemeResponse meme = memeService.getMeme(created.memeId());
         assertThat(created.memeId()).isEqualTo(meme.id());
         assertThat(created.userId()).isEqualTo(writer);
         assertThat(created.authorNickname()).isEqualTo("밈장인");
@@ -83,13 +92,53 @@ class MemeInterpretationServiceTest {
     }
 
     @Test
-    @DisplayName("대소문자만 다른 단어는 있는 문서에 의견을 붙이고, 출처 값은 무시한다")
-    void 대소문자만_다르면_기존_문서() {
-        MemeInterpretationResponse created = interpretationService.createInterpretation(command("Tmi"));
+    @DisplayName("같은 단어·출처면 대소문자나 모바일·웹 링크가 달라도 있는 문서에 붙고, 제목은 바꾸지 않는다")
+    void 같은_단어_출처면_기존_문서() {
+        MemeInterpretationResponse created =
+                interpretationService.createInterpretation(command("Tmi", "https://m.youtube.com/watch?v=tmi01&t=3s"));
 
         assertThat(created.memeId()).isEqualTo(tmi.getId());
-        assertThat(memeService.getMeme("tmi").sourceUrl()).isNull();
-        assertThat(memeService.getMemes("tmi", 0, 20).totalElements()).isEqualTo(1);
+        assertThat(memeService.getMeme(tmi.getId()).title()).isNull();
+        assertThat(memeService.getMemesByWord("tmi", 0, 20).totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("같은 단어라도 출처가 다르면 새 문서를 만든다")
+    void 출처가_다르면_새_문서() {
+        MemeInterpretationResponse created =
+                interpretationService.createInterpretation(command("TMI", "https://x.com/someone/status/1"));
+
+        assertThat(created.memeId()).isNotEqualTo(tmi.getId());
+        assertThat(memeService.getMemesByWord("tmi", 0, 20).content()).extracting(MemeResponse::id)
+                .containsExactly(created.memeId(), tmi.getId());
+    }
+
+    @Test
+    @DisplayName("고른 문서에 의견을 쓸 수 있고, 없거나 숨김인 문서면 MEME_NOT_FOUND")
+    void 고른_문서에_작성() {
+        MemeInterpretationResponse created = interpretationService.addInterpretation(
+                new AddMemeInterpretationCommand(tmi.getId(), reader, "뜻", "내용"));
+
+        assertThat(created.memeId()).isEqualTo(tmi.getId());
+        assertThat(created.authorNickname()).isEqualTo("TMI러");
+        for (Long memeId : new Long[] {-1L, hidden.getId()}) {
+            assertThatThrownBy(() -> interpretationService.addInterpretation(
+                    new AddMemeInterpretationCommand(memeId, reader, "뜻", "내용")))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(MemeErrorCode.MEME_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @DisplayName("정규화한 출처 주소가 500자를 넘으면 MEME_SOURCE_URL_TOO_LONG (http를 https로 바꾸면 한 글자 는다)")
+    void 정규화로_길어지는_주소() {
+        String url = "http://example.com/" + "a".repeat(500 - "http://example.com/".length());
+
+        assertThatThrownBy(() -> interpretationService.createInterpretation(command("TMI", url)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(MemeErrorCode.MEME_SOURCE_URL_TOO_LONG);
     }
 
     @Test
@@ -105,9 +154,9 @@ class MemeInterpretationServiceTest {
     }
 
     @Test
-    @DisplayName("숨김 문서의 단어로 쓰면 새 문서를 만들지 않고 MEME_NOT_FOUND")
+    @DisplayName("숨김 문서의 단어·출처로 쓰면 새 문서를 만들지 않고 MEME_NOT_FOUND")
     void 숨김_문서에_작성() {
-        assertThatThrownBy(() -> interpretationService.createInterpretation(command("알숨김")))
+        assertThatThrownBy(() -> interpretationService.createInterpretation(command("알숨김", HIDDEN_SOURCE)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(MemeErrorCode.MEME_NOT_FOUND);

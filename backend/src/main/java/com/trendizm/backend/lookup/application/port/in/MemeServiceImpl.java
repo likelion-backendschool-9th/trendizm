@@ -36,8 +36,16 @@ public class MemeServiceImpl implements MemeService {
     }
 
     @Override
-    public MemeResponse getMeme(String word) {
-        return memeRepository.findByWordAndStatus(Meme.normalizeWord(word), MemeStatus.PUBLIC)
+    public PageResponse<MemeResponse> getMemesByWord(String word, int page, int size) {
+        Page<Meme> memes = memeRepository.findByWordAndStatus(
+                Meme.normalizeWord(word), MemeStatus.PUBLIC, PageRequest.of(page, size, LATEST_FIRST));
+        return PageResponse.from(memes, MemeResponse::from);
+    }
+
+    @Override
+    public MemeResponse getMeme(Long memeId) {
+        return memeRepository.findById(memeId)
+                .filter(meme -> !meme.isHidden())
                 .map(MemeResponse::from)
                 .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
     }

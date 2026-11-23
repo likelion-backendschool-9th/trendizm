@@ -1,8 +1,8 @@
 package com.trendizm.backend.lookup.application.dto;
 
 /**
- * 의견 작성 요청을 서비스로 넘기는 값. word는 사용자가 입력한 단어 그대로이고 서비스에서 Meme.normalizeWord로 바꾼다.
- * 출처 값(sourceUrl, title, thumbnailUrl)은 이 의견으로 문서가 새로 만들어질 때만 쓴다. 없으면 null이다.
+ * 단어·출처로 의견을 쓴다. 같은 단어·출처의 문서가 있으면 거기에 붙이고, 없으면 문서를 만든다.
+ * word·sourceUrl은 사용자가 입력한 그대로이고 서비스에서 정규화한다. 제목·썸네일은 새 문서를 만들 때만 쓰고 없으면 null이다.
  */
 public record CreateMemeInterpretationCommand(
         String word,
