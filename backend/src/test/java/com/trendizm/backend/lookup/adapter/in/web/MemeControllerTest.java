@@ -13,6 +13,9 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.MemeResponse;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
 import com.trendizm.backend.lookup.application.port.MemeService;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -37,22 +40,56 @@ class MemeControllerTest {
     private MemeService memeService;
 
     @Test
-    @DisplayName("로그인 없이 q로 단어가 같은 문서를 조회한다")
-    void 단어로_조회() throws Exception {
-        given(memeService.getMeme("알잘딱깔센")).willReturn(MEME);
+    @DisplayName("로그인 없이 q로 단어가 같은 문서 목록(출처별)을 조회한다")
+    void 단어로_목록() throws Exception {
+        given(memeService.getMemesByWord("알잘딱깔센", null, 0, 20))
+                .willReturn(new PageResponse<>(List.of(MEME), 0, 20, 1, 1, false));
 
         mockMvc.perform(get("/api/lookup/memes").param("q", "알잘딱깔센"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.word").value("알잘딱깔센"))
+                .andExpect(jsonPath("$.content[0].word").value("알잘딱깔센"))
+                .andExpect(jsonPath("$.content[0].sourceUrl").value("https://video.example.com/watch/01"));
+    }
+
+    @Test
+    @DisplayName("sourceUrl을 함께 주면 서비스에 넘긴다 (인코딩된 ?·&도 주소 안의 값으로 받는다)")
+    void 단어와_출처로_목록() throws Exception {
+        given(memeService.getMemesByWord("알잘딱깔센", "https://youtube.com/watch?v=abc&t=30s", 0, 20))
+                .willReturn(new PageResponse<>(List.of(MEME), 0, 20, 1, 1, false));
+
+        // 브라우저처럼 값을 인코딩해서 보낸다. MockMvc의 문자열 주소는 %를 한 번 더 인코딩하므로 URI로 넘긴다
+        String query = "q=" + URLEncoder.encode("알잘딱깔센", StandardCharsets.UTF_8)
+                + "&sourceUrl=" + URLEncoder.encode("https://youtube.com/watch?v=abc&t=30s", StandardCharsets.UTF_8);
+        mockMvc.perform(get(URI.create("/api/lookup/memes?" + query)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1));
+    }
+
+    @Test
+    @DisplayName("sourceUrl이 http(s)://가 아니면 400 INVALID_INPUT")
+    void 잘못된_출처_주소() throws Exception {
+        mockMvc.perform(get("/api/lookup/memes").param("q", "TMI").param("sourceUrl", "javascript:alert(1)"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verifyNoInteractions(memeService);
+    }
+
+    @Test
+    @DisplayName("목록에서 고른 문서를 id로 조회한다")
+    void 문서_조회() throws Exception {
+        given(memeService.getMeme(1L)).willReturn(MEME);
+
+        mockMvc.perform(get("/api/lookup/memes/{memeId}", 1L))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("영상 제목"));
     }
 
     @Test
-    @DisplayName("없는 단어는 404 MEME_NOT_FOUND")
-    void 없는_단어() throws Exception {
-        given(memeService.getMeme("없는단어")).willThrow(new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
+    @DisplayName("없는 문서는 404 MEME_NOT_FOUND")
+    void 없는_문서() throws Exception {
+        given(memeService.getMeme(99L)).willThrow(new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
 
-        mockMvc.perform(get("/api/lookup/memes").param("q", "없는단어"))
+        mockMvc.perform(get("/api/lookup/memes/{memeId}", 99L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("MEME_NOT_FOUND"));
     }
@@ -60,7 +97,8 @@ class MemeControllerTest {
     @Test
     @DisplayName("'/'나 '%'가 들어간 단어도 q로 조회할 수 있다")
     void 특수문자_단어() throws Exception {
-        given(memeService.getMeme("50%/할인")).willReturn(MEME);
+        given(memeService.getMemesByWord("50%/할인", null, 0, 20))
+                .willReturn(new PageResponse<>(List.of(MEME), 0, 20, 1, 1, false));
 
         mockMvc.perform(get("/api/lookup/memes").param("q", "50%/할인"))
                 .andExpect(status().isOk());
