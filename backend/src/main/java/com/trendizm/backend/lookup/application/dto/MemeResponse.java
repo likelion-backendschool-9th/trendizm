@@ -1,11 +1,25 @@
 package com.trendizm.backend.lookup.application.dto;
 
 import com.trendizm.backend.lookup.domain.entity.Meme;
+import java.time.LocalDateTime;
 
-/** 컬럼이 정해지면 응답 필드를 추가한다. */
-public record MemeResponse(Long id) {
+/** 밈 문서. 출처 값(sourceUrl, title, thumbnailUrl)은 없으면 null */
+public record MemeResponse(
+        Long id,
+        String word,
+        String sourceUrl,
+        String title,
+        String thumbnailUrl,
+        LocalDateTime createdAt
+) {
 
     public static MemeResponse from(Meme meme) {
-        return new MemeResponse(meme.getId());
+        return new MemeResponse(
+                meme.getId(),
+                meme.getWord(),
+                meme.getSourceUrl(),
+                meme.getTitle(),
+                meme.getThumbnailUrl(),
+                meme.getCreatedAt());
     }
 }
