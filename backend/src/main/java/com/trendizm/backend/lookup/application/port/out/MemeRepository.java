@@ -14,6 +14,9 @@ public interface MemeRepository {
 
     Meme save(Meme meme);
 
+    /** 바로 DB에 반영한다. 동시에 같은 단어로 만들면 여기서 DataIntegrityViolationException이 난다 */
+    Meme saveAndFlush(Meme meme);
+
     Optional<Meme> findById(Long id);
 
     /** 상태와 관계없이 찾는다. 문서를 만들기 전 중복 확인용(숨김 문서도 같은 단어로 본다). word는 Meme.normalizeWord로 바꿔서 넘긴다 */

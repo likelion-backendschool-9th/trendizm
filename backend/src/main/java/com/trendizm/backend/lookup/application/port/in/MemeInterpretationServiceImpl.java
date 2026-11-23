@@ -11,6 +11,7 @@ import com.trendizm.backend.lookup.application.port.out.MemeRepository;
 import com.trendizm.backend.lookup.domain.entity.Meme;
 import com.trendizm.backend.lookup.domain.entity.MemeInterpretation;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -30,14 +31,23 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     public MemeInterpretationResponse createInterpretation(CreateMemeInterpretationCommand command) {
         // 숨김 문서도 찾아야 한다. 공개 문서만 찾으면 숨김 단어를 새로 저장하려다 word UNIQUE 위반이 난다
         Meme meme = memeRepository.findByWord(Meme.normalizeWord(command.word()))
-                .orElseGet(() -> memeRepository.save(Meme.create(
-                        command.word(), command.userId(), command.sourceUrl(), command.title(), command.thumbnailUrl())));
+                .orElseGet(() -> createMeme(command));
         if (meme.isHidden()) {
             throw new BusinessException(MemeErrorCode.MEME_NOT_FOUND);
         }
         MemeInterpretation interpretation = interpretationRepository.save(MemeInterpretation.create(
                 meme.getId(), command.userId(), command.meaning(), command.content()));
         return MemeInterpretationResponse.from(interpretation);
+    }
+
+    private Meme createMeme(CreateMemeInterpretationCommand command) {
+        Meme meme = Meme.create(command.word(), command.userId(), command.sourceUrl(), command.title(), command.thumbnailUrl());
+        try {
+            // 위 조회와 저장 사이에 다른 요청이 같은 단어로 문서를 만들면 DB word UNIQUE에서 막힌다
+            return memeRepository.saveAndFlush(meme);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(MemeErrorCode.MEME_ALREADY_EXISTS);
+        }
     }
 
     @Override
