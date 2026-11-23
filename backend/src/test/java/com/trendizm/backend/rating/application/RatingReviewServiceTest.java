@@ -2,6 +2,7 @@ package com.trendizm.backend.rating.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.member.application.dto.RegisterMemberCommand;
@@ -20,6 +21,7 @@ import com.trendizm.backend.rating.application.port.ReviewSort;
 import com.trendizm.backend.rating.domain.enums.Sentiment;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -249,7 +251,7 @@ class RatingReviewServiceTest {
     }
 
     @Test
-    @DisplayName("후기를 수정하면 응답의 수정 시각이 DB에 저장된 새 수정 시각과 같다")
+    @DisplayName("후기를 수정하면 응답의 수정 시각이 DB에 저장된 새 수정 시각과 같다 (DB 정밀도 차이는 1ms까지 허용)")
     void 수정_시각() throws InterruptedException {
         RatingReviewSaveResult created = save(alice, Sentiment.LIKE, 5);
         entityManager.flush();
@@ -259,7 +261,9 @@ class RatingReviewServiceTest {
         entityManager.clear();
 
         LocalDateTime saved = ratingRepository.findById(updated.review().id()).orElseThrow().getUpdatedAt();
-        assertThat(updated.review().updatedAt()).isEqualTo(saved);
+        // Linux JVM은 나노초까지, DB(timestamp)는 마이크로초까지 저장해서 끝자리가 다를 수 있다.
+        // 고치기 전에는 수정 전 시각(10ms 이상 차이)이 나갔으므로 1ms 허용으로도 그 문제는 잡힌다
+        assertThat(updated.review().updatedAt()).isCloseTo(saved, within(1, ChronoUnit.MILLIS));
         assertThat(updated.review().updatedAt()).isAfter(created.review().updatedAt());
     }
 }
