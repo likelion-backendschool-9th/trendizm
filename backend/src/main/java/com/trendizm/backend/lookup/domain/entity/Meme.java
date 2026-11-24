@@ -13,6 +13,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.text.Normalizer;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -66,6 +68,16 @@ public class Meme extends BaseCreatedEntity {
     @Column(length = 500)
     private String thumbnail;
 
+    /**
+     * 의견 AI 요약. 신뢰도(동의 - 비동의) 상위 의견을 요약한 글이다(MemeSummaryServiceImpl).
+     * 의견이 2개 이상일 때 만들고, 그 전에는 null이다. 화면에는 "AI 요약"으로 표시하고 원래 의견도 함께 보여 준다.
+     */
+    @Column(columnDefinition = "text")
+    private String aiSummary;
+
+    /** 요약을 만든 시각. 같은 문서의 요약을 너무 자주 다시 만들지 않게 간격을 잴 때 쓴다 */
+    private LocalDateTime aiSummaryUpdatedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private MemeStatus status;
@@ -94,6 +106,17 @@ public class Meme extends BaseCreatedEntity {
     /** 저장한 썸네일 이미지 파일명을 기록한다 */
     public void changeThumbnail(String filename) {
         this.thumbnail = Objects.requireNonNull(filename, "filename");
+    }
+
+    /** 새로 만든 AI 요약과 만든 시각을 기록한다 */
+    public void changeAiSummary(String summary, LocalDateTime now) {
+        this.aiSummary = Objects.requireNonNull(summary, "summary");
+        this.aiSummaryUpdatedAt = Objects.requireNonNull(now, "now");
+    }
+
+    /** 마지막 요약을 만든 지 interval이 안 지났으면 true (다시 만들지 않는다) */
+    public boolean isAiSummaryFresh(LocalDateTime now, Duration interval) {
+        return aiSummaryUpdatedAt != null && aiSummaryUpdatedAt.isAfter(now.minus(interval));
     }
 
     /**
