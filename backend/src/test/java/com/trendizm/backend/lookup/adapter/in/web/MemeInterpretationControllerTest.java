@@ -54,7 +54,7 @@ class MemeInterpretationControllerTest {
     @DisplayName("로그인하면 의견을 쓸 수 있다. '/'·'%'가 든 단어도 본문으로 받고, 빈 출처 값은 null로 넘긴다")
     void 의견_작성() throws Exception {
         CreateMemeInterpretationCommand command = new CreateMemeInterpretationCommand(
-                "50%/할인", 7L, "알아서 잘 딱 깔끔하고 센스 있게", "내용", "https://video.example.com/watch/01", null, null);
+                "50%/할인", 7L, "알아서 잘 딱 깔끔하고 센스 있게", "내용", "https://video.example.com/watch/01", null);
         given(interpretationService.createInterpretation(command)).willReturn(INTERPRETATION);
 
         mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
@@ -115,9 +115,9 @@ class MemeInterpretationControllerTest {
     }
 
     @Test
-    @DisplayName("출처·썸네일 주소가 http(s)://가 아니면 400 INVALID_INPUT (javascript: 주소로 XSS 방지)")
+    @DisplayName("출처 주소가 http(s)://가 아니면 400 INVALID_INPUT (javascript: 주소로 XSS 방지)")
     void 잘못된_주소() throws Exception {
-        for (String field : List.of("sourceUrl", "thumbnailUrl")) {
+        for (String field : List.of("sourceUrl")) {
             for (String url : List.of("javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "ftp://example.com/a",
                     "https://example.com/a b", "https://youtu.be/abc\u200B", "https://example.com/ㅤ")) {
                 mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
@@ -132,15 +132,15 @@ class MemeInterpretationControllerTest {
     }
 
     @Test
-    @DisplayName("주소는 대소문자와 관계없이 http(s)://면 받고, 빈 값은 null로 넘긴다")
+    @DisplayName("주소는 대소문자와 관계없이 http(s)://면 받는다. 썸네일 주소를 보내도 쓰지 않는다(서버가 출처에서 가져온다)")
     void 허용되는_주소() throws Exception {
         CreateMemeInterpretationCommand command = new CreateMemeInterpretationCommand(
-                "TMI", 7L, "뜻", "내용", "HTTP://example.com/a", null, null);
+                "TMI", 7L, "뜻", "내용", "HTTP://example.com/a", null);
         given(interpretationService.createInterpretation(command)).willReturn(INTERPRETATION);
 
         mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"word\":\"TMI\",\"meaning\":\"뜻\",\"content\":\"내용\","
-                                + "\"sourceUrl\":\"HTTP://example.com/a\",\"thumbnailUrl\":\"\"}"))
+                                + "\"sourceUrl\":\"HTTP://example.com/a\",\"thumbnailUrl\":\"https://evil.example/a.png\"}"))
                 .andExpect(status().isCreated());
     }
 

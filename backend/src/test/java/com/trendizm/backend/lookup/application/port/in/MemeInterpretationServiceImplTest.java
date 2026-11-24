@@ -38,7 +38,7 @@ class MemeInterpretationServiceImplTest {
         given(memeRepository.saveAndFlush(any(Meme.class))).willThrow(new DataIntegrityViolationException("uk_memes_word"));
 
         assertThatThrownBy(() -> service.createInterpretation(
-                new CreateMemeInterpretationCommand("알잘딱깔센", 2L, "뜻", "내용", "https://example.com/1", null, null)))
+                new CreateMemeInterpretationCommand("알잘딱깔센", 2L, "뜻", "내용", "https://example.com/1", null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(MemeErrorCode.MEME_ALREADY_EXISTS);

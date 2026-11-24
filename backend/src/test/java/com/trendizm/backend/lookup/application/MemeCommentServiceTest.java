@@ -61,13 +61,13 @@ class MemeCommentServiceTest {
     void setUp() {
         writer = memberService.register(new RegisterMemberCommand("writer@test.com", "encoded", "밈장인", false));
         reader = memberService.register(new RegisterMemberCommand("reader@test.com", "encoded", "TMI러", false));
-        Long memeId = memeRepository.save(Meme.create("TMI", writer, "https://youtu.be/tmi01", null, null)).getId();
+        Long memeId = memeRepository.save(Meme.create("TMI", writer, "https://youtu.be/tmi01", null)).getId();
         interpretationId = interpretationRepository.save(
                 MemeInterpretation.create(memeId, writer, "Too Much Information", "내용")).getId();
         otherInterpretationId = interpretationRepository.save(
                 MemeInterpretation.create(memeId, writer, "다른 뜻", "내용")).getId();
 
-        Meme hidden = Meme.create("알숨김", writer, "https://example.com/hidden", null, null);
+        Meme hidden = Meme.create("알숨김", writer, "https://example.com/hidden", null);
         hidden.hide();
         Long hiddenMemeId = memeRepository.save(hidden).getId();
         hiddenInterpretationId = interpretationRepository.save(

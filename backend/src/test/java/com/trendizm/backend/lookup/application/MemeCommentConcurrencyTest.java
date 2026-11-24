@@ -69,7 +69,7 @@ class MemeCommentConcurrencyTest {
     void setUp() {
         writer = memberService.register(new RegisterMemberCommand("writer@test.com", "encoded", "밈장인", false));
         reader = memberService.register(new RegisterMemberCommand("reader@test.com", "encoded", "TMI러", false));
-        Long memeId = memeRepository.save(Meme.create("TMI", writer, "https://youtu.be/tmi01", null, null)).getId();
+        Long memeId = memeRepository.save(Meme.create("TMI", writer, "https://youtu.be/tmi01", null)).getId();
         interpretationId = interpretationRepository.save(
                 MemeInterpretation.create(memeId, writer, "Too Much Information", "내용")).getId();
         commentId = commentService.createComment(
