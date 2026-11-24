@@ -211,4 +211,16 @@ class ItemControllerTest {
         mockMvc.perform(get("/api/items").param("category", "").param("subcategory", " "))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    @DisplayName("잠금 해제는 로그인한 회원 id를 넘기고, 로그인하지 않으면 401")
+    void 잠금_해제() throws Exception {
+        given(itemService.unlockRecommendation(5L, 7L)).willReturn(null);
+
+        mockMvc.perform(post("/api/items/recommendations/5/unlock").with(user(LOGIN_USER)))
+                .andExpect(status().isOk());
+        verify(itemService).unlockRecommendation(5L, 7L);
+
+        mockMvc.perform(post("/api/items/recommendations/5/unlock")).andExpect(status().isUnauthorized());
+    }
 }

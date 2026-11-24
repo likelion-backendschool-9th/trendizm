@@ -43,8 +43,15 @@ public interface ItemService {
     /** 공감하지 않았으면 아무것도 하지 않는다 */
     void unlikeComment(Long commentId, Long userId);
 
-    /** 추천 아이템 목록 (등록순). 등록자 본인 것만 열린 상태이고 나머지는 잠긴 상태다 */
+    /** 추천 아이템 목록 (등록순). 보는 사람이 등록했거나 열람한 아이템은 열린 상태, 나머지는 잠긴 상태다 */
     List<ItemResponse> getRecommendations(Long questionId, Long viewerId);
 
     ItemResponse createRecommendation(CreateItemCommand command);
+
+    /**
+     * 추천 아이템 잠금 해제. 열람자에게서 열람 가격(100P)을 차감하고 등록자에게 같은 금액을 적립한 뒤, 열린 아이템을 돌려준다.
+     * 이미 열람했거나 내가 등록한 아이템이면 포인트를 쓰지 않고 열린 아이템을 돌려준다.
+     * 없거나 숨긴 질문 글의 아이템이면 ITEM_RECOMMENDATION_NOT_FOUND, 포인트가 부족하면 포인트 도메인의 INSUFFICIENT_POINT_BALANCE
+     */
+    ItemResponse unlockRecommendation(Long recommendationId, Long userId);
 }
