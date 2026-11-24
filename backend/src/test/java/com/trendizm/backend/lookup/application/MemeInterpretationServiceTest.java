@@ -7,6 +7,7 @@ import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
+import com.trendizm.backend.lookup.application.dto.MemeCreatedEvent;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
 import com.trendizm.backend.lookup.application.dto.MemeResponse;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
@@ -23,12 +24,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Transactional
+@RecordApplicationEvents
 class MemeInterpretationServiceTest {
+
+    @Autowired
+    private ApplicationEvents events;
 
     @Autowired
     private MemeInterpretationService interpretationService;
@@ -62,14 +69,14 @@ class MemeInterpretationServiceTest {
     void setUp() {
         writer = memberService.register(new RegisterMemberCommand("writer@test.com", "encoded", "밈장인", false));
         reader = memberService.register(new RegisterMemberCommand("reader@test.com", "encoded", "TMI러", false));
-        tmi = memeRepository.save(Meme.create("TMI", 1L, TMI_SOURCE, null, null));
-        hidden = Meme.create("알숨김", 1L, HIDDEN_SOURCE, null, null);
+        tmi = memeRepository.save(Meme.create("TMI", 1L, TMI_SOURCE, null));
+        hidden = Meme.create("알숨김", 1L, HIDDEN_SOURCE, null);
         hidden.hide();
         memeRepository.save(hidden);
     }
 
     private CreateMemeInterpretationCommand command(String word, String sourceUrl) {
-        return new CreateMemeInterpretationCommand(word, writer, "뜻", "내용", sourceUrl, "영상 제목", null);
+        return new CreateMemeInterpretationCommand(word, writer, "뜻", "내용", sourceUrl, "영상 제목");
     }
 
     private CreateMemeInterpretationCommand command(String word) {
@@ -100,6 +107,16 @@ class MemeInterpretationServiceTest {
         assertThat(created.memeId()).isEqualTo(tmi.getId());
         assertThat(memeService.getMeme(tmi.getId()).title()).isNull();
         assertThat(memeService.getMemesByWord("tmi", null, 0, 20).totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("문서를 새로 만들 때만 썸네일 채우기 이벤트(MemeCreatedEvent)를 낸다. 있는 문서에 붙으면 내지 않는다")
+    void 새_문서_이벤트() {
+        MemeInterpretationResponse created =
+                interpretationService.createInterpretation(command("TMI", "https://x.com/someone/status/1"));
+        interpretationService.createInterpretation(command("TMI", TMI_SOURCE));
+
+        assertThat(events.stream(MemeCreatedEvent.class)).containsExactly(new MemeCreatedEvent(created.memeId()));
     }
 
     @Test

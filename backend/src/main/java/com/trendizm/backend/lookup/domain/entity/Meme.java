@@ -59,8 +59,12 @@ public class Meme extends BaseCreatedEntity {
     /** 출처의 제목 */
     private String title;
 
+    /**
+     * 저장한 썸네일 이미지 파일명 (예: 3f2c...e1.jpg). 주소가 아니라 파일명이고, 화면은 GET /api/lookup/memes/thumbnails/{파일명}으로 불러온다.
+     * 문서를 만든 뒤 출처에서 이미지를 받아 저장하면 채운다(MemeThumbnailServiceImpl). 못 받았으면 null이고 화면에서 대체 이미지를 보여 준다.
+     */
     @Column(length = 500)
-    private String thumbnailUrl;
+    private String thumbnail;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -70,24 +74,26 @@ public class Meme extends BaseCreatedEntity {
     @Column(nullable = false)
     private Long userId;
 
-    private Meme(String word, Long userId, String sourceUrl, String title, String thumbnailUrl) {
+    private Meme(String word, Long userId, String sourceUrl, String title) {
         this.word = word;
         this.userId = userId;
         this.sourceUrl = sourceUrl;
         this.title = title;
-        this.thumbnailUrl = thumbnailUrl;
         this.status = MemeStatus.PUBLIC;
     }
 
-    /** 단어는 normalizeWord, 출처 주소는 SourceUrl.normalize로 바꿔 저장한다. 출처 주소는 필수이고 제목·썸네일은 없으면 null */
-    /** 썸네일을 비워 두면 유튜브 영상은 영상 ID로 썸네일 주소를 채운다. 다른 출처는 비워 둔다(화면에서 기본 이미지) */
-    public static Meme create(String word, Long userId, String sourceUrl, String title, String thumbnailUrl) {
+    /**
+     * 단어는 normalizeWord, 출처 주소는 SourceUrl.normalize로 바꿔 저장한다. 출처 주소는 필수이고 제목은 없으면 null.
+     * 썸네일은 비워 두고, 문서가 저장된 뒤 출처에서 이미지를 받아 changeThumbnail로 채운다.
+     */
+    public static Meme create(String word, Long userId, String sourceUrl, String title) {
         Objects.requireNonNull(sourceUrl, "출처 주소는 필수입니다");
-        String normalizedSource = SourceUrl.normalize(sourceUrl);
-        String thumbnail = thumbnailUrl != null
-                ? thumbnailUrl
-                : SourceUrl.youtubeThumbnail(normalizedSource).orElse(null);
-        return new Meme(normalizeWord(word), userId, normalizedSource, title, thumbnail);
+        return new Meme(normalizeWord(word), userId, SourceUrl.normalize(sourceUrl), title);
+    }
+
+    /** 저장한 썸네일 이미지 파일명을 기록한다 */
+    public void changeThumbnail(String filename) {
+        this.thumbnail = Objects.requireNonNull(filename, "filename");
     }
 
     /**

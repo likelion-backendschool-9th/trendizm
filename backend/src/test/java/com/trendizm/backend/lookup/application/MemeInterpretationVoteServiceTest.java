@@ -60,11 +60,11 @@ class MemeInterpretationVoteServiceTest {
     /** 공개 문서 tmi의 의견 1개, 숨김 문서 알숨김의 의견 1개. 테스트가 끝나면 롤백된다 */
     @BeforeEach
     void setUp() {
-        memeId = memeRepository.save(Meme.create("TMI", WRITER, "https://youtu.be/tmi01", null, null)).getId();
+        memeId = memeRepository.save(Meme.create("TMI", WRITER, "https://youtu.be/tmi01", null)).getId();
         interpretationId = interpretationRepository.save(
                 MemeInterpretation.create(memeId, WRITER, "Too Much Information", "내용")).getId();
 
-        Meme hidden = Meme.create("알숨김", WRITER, "https://example.com/hidden", null, null);
+        Meme hidden = Meme.create("알숨김", WRITER, "https://example.com/hidden", null);
         hidden.hide();
         Long hiddenMemeId = memeRepository.save(hidden).getId();
         hiddenInterpretationId = interpretationRepository.save(

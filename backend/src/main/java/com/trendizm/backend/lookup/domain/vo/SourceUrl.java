@@ -26,8 +26,8 @@ import java.util.regex.Pattern;
  * 그 밖의 주소는 https로 통일, 호스트 소문자, 앞의 www.·m.·mobile. 제거, # 뒤 제거, 추적 파라미터(utm_* 등) 제거, 끝 / 제거만 한다.
  * 주소로 해석할 수 없는 값은 앞뒤 공백만 지운다.
  *
- * <p>썸네일: 유튜브는 영상 ID로 썸네일 주소가 정해져 있어서(youtubeThumbnail) 외부에 접속하지 않고 만든다.
- * 다른 플랫폼은 규칙이 없어서 만들지 않는다(화면에서 기본 이미지를 보여 준다).
+ * <p>썸네일: 유튜브는 영상 ID로 썸네일 이미지 주소가 정해져 있다(youtubeThumbnail).
+ * 다른 출처는 페이지의 메타데이터(og:image)에서 찾는다(MemeThumbnailServiceImpl).
  */
 public final class SourceUrl {
 

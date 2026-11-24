@@ -15,7 +15,7 @@ class MemeTest {
     @Test
     @DisplayName("새 문서는 공개 상태이고 단어 앞뒤 공백을 지우고, 출처 주소는 정규화해 저장한다")
     void 문서_생성() {
-        Meme meme = Meme.create("  알잘딱깔센 ", 1L, SOURCE, "영상 제목", null);
+        Meme meme = Meme.create("  알잘딱깔센 ", 1L, SOURCE, "영상 제목");
 
         assertThat(meme.getWord()).isEqualTo("알잘딱깔센");
         assertThat(meme.getSourceUrl()).isEqualTo("https://youtube.com/watch?v=abc123");
@@ -26,13 +26,13 @@ class MemeTest {
     @Test
     @DisplayName("출처 주소는 필수다")
     void 출처_필수() {
-        assertThatThrownBy(() -> Meme.create("TMI", 1L, null, null, null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Meme.create("TMI", 1L, null, null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("단어는 소문자로 저장하고 띄어쓰기는 그대로 둔다")
     void 단어_정규화() {
-        Meme meme = Meme.create(" TMI ", 1L, SOURCE, null, null);
+        Meme meme = Meme.create(" TMI ", 1L, SOURCE, null);
 
         assertThat(meme.getWord()).isEqualTo("tmi");
         assertThat(Meme.normalizeWord(" 알잘딱 깔센 ")).isEqualTo("알잘딱 깔센");
@@ -52,7 +52,7 @@ class MemeTest {
     @Test
     @DisplayName("숨김과 해제")
     void 숨김_해제() {
-        Meme meme = Meme.create("중꺾마", 1L, SOURCE, null, null);
+        Meme meme = Meme.create("중꺾마", 1L, SOURCE, null);
 
         meme.hide();
         assertThat(meme.isHidden()).isTrue();
@@ -62,12 +62,12 @@ class MemeTest {
     }
 
     @Test
-    @DisplayName("썸네일을 비워 두면 유튜브 영상은 썸네일을 채우고, 다른 출처는 비워 두고, 직접 넣은 썸네일은 그대로 쓴다")
+    @DisplayName("문서를 만들 때 썸네일은 비어 있고, 저장한 이미지 파일명을 나중에 기록한다")
     void 썸네일() {
-        assertThat(Meme.create("TMI", 1L, SOURCE, null, null).getThumbnailUrl())
-                .isEqualTo("https://i.ytimg.com/vi/abc123/hqdefault.jpg");
-        assertThat(Meme.create("TMI", 1L, "https://x.com/someone/status/1", null, null).getThumbnailUrl()).isNull();
-        assertThat(Meme.create("TMI", 1L, SOURCE, null, "https://img.example.com/a.png").getThumbnailUrl())
-                .isEqualTo("https://img.example.com/a.png");
+        Meme meme = Meme.create("TMI", 1L, SOURCE, null);
+        assertThat(meme.getThumbnail()).isNull();
+
+        meme.changeThumbnail("0123456789abcdef0123456789abcdef.jpg");
+        assertThat(meme.getThumbnail()).isEqualTo("0123456789abcdef0123456789abcdef.jpg");
     }
 }

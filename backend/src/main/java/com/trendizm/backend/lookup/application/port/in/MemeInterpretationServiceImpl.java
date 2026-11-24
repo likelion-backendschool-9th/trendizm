@@ -4,6 +4,7 @@ import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
+import com.trendizm.backend.lookup.application.dto.MemeCreatedEvent;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationAddedEvent;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationVotedEvent;
@@ -49,7 +50,7 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     private final MemeInterpretationRepository interpretationRepository;
     private final MemeInterpretationVoteRepository voteRepository;
     private final MemberService memberService;
-    /** 커밋 뒤 알림(notification)이 받는 이벤트를 발행한다. lookup은 알림 도메인을 직접 부르지 않는다 */
+    /** 커밋 뒤 처리할 이벤트를 발행한다: 알림(notification)·썸네일 저장(MemeThumbnailServiceImpl). lookup은 알림 도메인을 직접 부르지 않는다 */
     private final ApplicationEventPublisher eventPublisher;
 
     /** 문서 생성과 의견 저장이 한 트랜잭션이라, 의견 저장이 실패하면 새 문서도 롤백되어 빈 문서가 남지 않는다 */
@@ -98,10 +99,13 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     }
 
     private Meme createMeme(CreateMemeInterpretationCommand command) {
-        Meme meme = Meme.create(command.word(), command.userId(), command.sourceUrl(), command.title(), command.thumbnailUrl());
+        Meme meme = Meme.create(command.word(), command.userId(), command.sourceUrl(), command.title());
         try {
             // 위 조회와 저장 사이에 다른 요청이 같은 단어·출처로 문서를 만들면 DB (word, source_url) UNIQUE에서 막힌다
-            return memeRepository.saveAndFlush(meme);
+            Meme saved = memeRepository.saveAndFlush(meme);
+            // 썸네일은 이 트랜잭션이 커밋된 뒤 따로 받아 저장한다(MemeThumbnailServiceImpl). 롤백되면 실행되지 않는다
+            eventPublisher.publishEvent(new MemeCreatedEvent(saved.getId()));
+            return saved;
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(MemeErrorCode.MEME_ALREADY_EXISTS);
         }

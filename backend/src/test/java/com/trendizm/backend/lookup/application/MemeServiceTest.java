@@ -37,12 +37,12 @@ class MemeServiceTest {
      */
     @BeforeEach
     void setUp() {
-        tmiVideo = memeRepository.save(Meme.create("TMI", 1L, "https://youtu.be/tmi01", "영상 제목", null));
-        memeRepository.save(Meme.create("알잘딱깔센", 1L, "https://example.com/1", null, null));
-        memeRepository.save(Meme.create("중꺾마", 1L, "https://example.com/2", null, null));
-        memeRepository.save(Meme.create("알빠노", 2L, "https://example.com/3", null, null));
-        tmiPost = memeRepository.save(Meme.create("tmi", 2L, "https://x.com/someone/status/1", null, null));
-        hidden = Meme.create("TMI", 2L, "https://example.com/hidden", null, null);
+        tmiVideo = memeRepository.save(Meme.create("TMI", 1L, "https://youtu.be/tmi01", "영상 제목"));
+        memeRepository.save(Meme.create("알잘딱깔센", 1L, "https://example.com/1", null));
+        memeRepository.save(Meme.create("중꺾마", 1L, "https://example.com/2", null));
+        memeRepository.save(Meme.create("알빠노", 2L, "https://example.com/3", null));
+        tmiPost = memeRepository.save(Meme.create("tmi", 2L, "https://x.com/someone/status/1", null));
+        hidden = Meme.create("TMI", 2L, "https://example.com/hidden", null);
         hidden.hide();
         memeRepository.save(hidden);
     }

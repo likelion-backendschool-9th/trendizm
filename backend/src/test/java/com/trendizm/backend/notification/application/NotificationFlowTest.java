@@ -84,7 +84,7 @@ class NotificationFlowTest {
         voter = register("voter");
         otherVoter = register("other");
         MemeInterpretationResponse first = interpretationService.createInterpretation(new CreateMemeInterpretationCommand(
-                "TMI", writer, "Too Much Information", "내용", "https://youtu.be/tmi01", null, null));
+                "TMI", writer, "Too Much Information", "내용", "https://youtu.be/tmi01", null));
         memeId = first.memeId();
         interpretationId = first.id();
         awaitNotifications();
