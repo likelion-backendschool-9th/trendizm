@@ -10,7 +10,7 @@ const CONTENT = {
   season: "시즌 2",
   episodeLength: "에피소드당 60분",
   category: { slug: "media", name: "미디어" },
-  subcategory: { slug: "airing", name: "방영중" },
+  subcategory: { slug: "drama", name: "드라마" },
 };
 
 const LIKE = {
