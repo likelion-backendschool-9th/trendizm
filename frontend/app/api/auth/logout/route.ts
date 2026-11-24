@@ -2,9 +2,12 @@
 // 백엔드에 닿지 못하거나 실패해도 쿠키는 지운다. 브라우저에서는 바로 로그아웃된 상태가 된다.
 // 이미 발급된 액세스 토큰은 만료(30분)까지 유효하지만, 쿠키가 지워져 브라우저는 더 보내지 않는다.
 import { NextResponse, type NextRequest } from "next/server";
-import { BACKEND_URL, clearAuthCookies, REFRESH_TOKEN_COOKIE } from "@/lib/api/bff";
+import { BACKEND_URL, clearAuthCookies, crossSiteForbidden, isCrossSiteWrite, REFRESH_TOKEN_COOKIE } from "@/lib/api/bff";
 
 export async function POST(request: NextRequest) {
+  if (isCrossSiteWrite(request)) {
+    return crossSiteForbidden();
+  }
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   if (refreshToken) {
     try {
