@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import Comments from "@/app/item/[id]/_components/Comments";
 import Recommendations from "@/app/item/[id]/_components/Recommendations";
+import RefreshAfterReissue from "@/app/item/_components/RefreshAfterReissue";
 import ShareButton from "@/app/item/[id]/_components/ShareButton";
 import { findCategory } from "@/app/item/_lib/categories";
-import { fetchAsViewer } from "@/app/item/_lib/fetchAsViewer";
+import { accessTokenExpired, fetchAsViewer } from "@/app/item/_lib/fetchAsViewer";
 import { answerLabel, formatDate } from "@/app/item/_lib/format";
 import type {
   ItemAdjacentQuestions,
@@ -49,7 +50,7 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
     throw error;
   }
 
-  const [recommendations, comments, similar, adjacent] = await Promise.all([
+  const [recommendations, comments, similar, adjacent, authExpired] = await Promise.all([
     fetchAsViewer<ItemRecommendation[]>(`/api/items/${id}/recommendations`),
     fetchAsViewer<PageResponse<ItemComment>>(
       `/api/items/${id}/comments?page=0&size=${COMMENT_PAGE_SIZE}`,
@@ -58,6 +59,7 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
       `/api/items?subcategory=${question.subcategory.slug}&size=${SIMILAR_SIZE + 1}`,
     ),
     serverFetch<ItemAdjacentQuestions>(`/api/items/${id}/adjacent`),
+    accessTokenExpired(),
   ]);
   const similarQuestions = similar.content
     .filter((other) => other.id !== question.id)
@@ -75,6 +77,8 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
         color: "#111",
       }}
     >
+      {/* 액세스 토큰만 만료돼 로그인하지 않은 사람 기준으로 그렸으면, 브라우저에서 재발급한 뒤 다시 그린다 */}
+      {authExpired && <RefreshAfterReissue />}
       <div
         style={{
           display: "flex",

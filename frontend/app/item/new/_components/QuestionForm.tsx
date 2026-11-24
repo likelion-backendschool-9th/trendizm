@@ -24,7 +24,8 @@ export default function QuestionForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setSubmitting(true);
     setError(null);
     try {
@@ -36,6 +37,10 @@ export default function QuestionForm() {
           content: String(form.get("content") ?? "").trim(),
         },
       });
+      // Next가 이 페이지 상태를 기억해 두므로, 다시 "질문하기"로 들어왔을 때 빈 폼이 보이도록 초기화한다
+      formElement.reset();
+      setCategorySlug(ITEM_CATEGORIES[0].slug);
+      setSubmitting(false);
       router.push(`/item/${created.id}`);
     } catch (caught) {
       if (caught instanceof ApiError && caught.status !== 401) {

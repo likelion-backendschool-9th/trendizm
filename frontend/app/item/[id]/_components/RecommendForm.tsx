@@ -24,13 +24,20 @@ const FIELDS = [
 export default function RecommendForm({ questionId, onDone }: RecommendFormProps) {
   const [error, setError] = useState<ApiError | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [priceError, setPriceError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const text = (name: string) => String(form.get(name) ?? "").trim();
-    const price = text("price").replaceAll(",", "");
+    // "12,000원"처럼 써도 받는다. 그 밖에 숫자가 아닌 글자가 있으면 보내지 않고 알린다
+    const price = text("price").replace(/[,\s원]/g, "");
+    if (price && !/^\d+$/.test(price)) {
+      setPriceError("가격은 숫자로 입력해 주세요. 예: 12000");
+      return;
+    }
 
+    setPriceError(null);
     setSubmitting(true);
     setError(null);
     try {
@@ -84,7 +91,9 @@ export default function RecommendForm({ questionId, onDone }: RecommendFormProps
         <Field
           key={field.name}
           {...field}
-          message={error?.fieldMessage(field.name)}
+          message={
+            field.name === "price" && priceError ? priceError : error?.fieldMessage(field.name)
+          }
           inputMode={field.name === "price" ? "numeric" : undefined}
         />
       ))}

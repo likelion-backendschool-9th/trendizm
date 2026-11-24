@@ -40,9 +40,13 @@ export class ApiError extends Error {
     this.errors = body.errors ?? [];
   }
 
-  /** 특정 필드의 오류 메시지. 입력칸 아래에 띄울 때 쓴다. 예: error.fieldMessage("email") */
+  /**
+   * 특정 필드의 오류 메시지. 입력칸 아래에 띄울 때 쓴다. 예: error.fieldMessage("email")
+   * 목록 칸은 백엔드가 요소별로 tags[0]처럼 보내므로, fieldMessage("tags")는 그 오류도 찾는다.
+   */
   fieldMessage(field: string): string | undefined {
-    return this.errors.find((error) => error.field === field)?.message;
+    return this.errors.find((error) => error.field === field || error.field.startsWith(`${field}[`))
+      ?.message;
   }
 }
 
