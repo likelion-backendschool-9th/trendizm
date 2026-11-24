@@ -10,6 +10,7 @@ public interface MemeCommentService {
 
     /**
      * 댓글 목록 (최신순). 댓글마다 대댓글을 오래된 순으로 함께 담는다. page·size는 댓글(대댓글 제외) 기준.
+     * 삭제된 대댓글은 빼고, 삭제된 댓글은 살아 있는 대댓글이 있을 때만 deleted=true로 넣는다.
      * viewerId는 로그인한 사용자 id(likedByMe 표시용)이고 비로그인이면 null.
      * 의견이 없거나 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND
      */
@@ -25,8 +26,7 @@ public interface MemeCommentService {
     MemeCommentResponse updateComment(UpdateMemeCommentCommand command);
 
     /**
-     * 내 댓글을 지운다. 대댓글이 남아 있는 댓글은 "삭제된 댓글"로 흔적만 남기고, 아니면 행을 지운다.
-     * 대댓글을 지워서 흔적만 남은 부모 댓글에 대댓글이 하나도 남지 않으면 부모도 지운다.
+     * 내 댓글을 지운다. 댓글·대댓글 모두 행은 남기고 삭제 표시만 한다(논리 삭제). 그 댓글의 좋아요는 지운다.
      * 없거나 삭제된 댓글이면 MEME_COMMENT_NOT_FOUND, 남의 댓글이면 MEME_COMMENT_FORBIDDEN
      */
     void deleteComment(Long commentId, Long userId);

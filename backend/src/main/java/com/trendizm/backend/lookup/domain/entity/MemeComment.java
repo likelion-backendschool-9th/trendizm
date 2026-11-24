@@ -17,7 +17,8 @@ import lombok.NoArgsConstructor;
 /**
  * meme_comments 테이블. 의견의 댓글과 대댓글.
  * parentId가 비어 있으면 댓글, 값이 있으면 그 댓글에 단 대댓글이다. 대댓글에는 다시 답글을 달 수 없다(한 단계만).
- * deletedAt은 대댓글이 남아 있는 댓글을 지웠을 때만 채운다(흔적만 남김). 대댓글이 없으면 행을 지운다.
+ * 지워도 행은 남기고 deletedAt만 채운다(논리 삭제). 목록에서는 삭제된 대댓글을 빼고,
+ * 삭제된 댓글은 살아 있는 대댓글이 있을 때만 "삭제된 댓글"로 남긴다.
  */
 @Entity
 @Table(name = "meme_comments", indexes = {
@@ -46,7 +47,7 @@ public class MemeComment extends BaseTimeEntity {
     @Column(nullable = false, length = MAX_CONTENT_LENGTH)
     private String content;
 
-    /** 비어 있으면 정상, 값이 있으면 삭제된 댓글(대댓글이 남아 있어 흔적만 표시) */
+    /** 비어 있으면 정상, 값이 있으면 삭제된 댓글 */
     private LocalDateTime deletedAt;
 
     private MemeComment(Long interpretationId, Long parentId, Long userId, String content) {
@@ -77,7 +78,7 @@ public class MemeComment extends BaseTimeEntity {
         this.content = Objects.requireNonNull(content, "content");
     }
 
-    /** 대댓글이 남아 있는 댓글을 지울 때 쓴다. 내용은 응답에 내보내지 않는다 */
+    /** 댓글을 지운다(행은 남긴다). 내용은 응답에 내보내지 않는다 */
     public void markDeleted() {
         this.deletedAt = LocalDateTime.now();
     }

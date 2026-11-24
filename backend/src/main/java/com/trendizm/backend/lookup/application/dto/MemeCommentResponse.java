@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * 댓글 하나. 댓글이면 replies에 대댓글이 오래된 순으로 들어 있고, 대댓글이면 replies는 비어 있다.
- * deleted가 true면 대댓글이 남아 있어 흔적만 남긴 삭제 댓글이라 userId·authorNickname·content는 null이고 좋아요는 0이다.
+ * deleted가 true면 삭제된 댓글(살아 있는 대댓글이 있어 남긴 것)이라 userId·authorNickname·content는 null이고 좋아요는 0이다.
  * likedByMe는 보는 사람이 좋아요했는지다. 로그인하지 않았으면 false.
  * 작성자 닉네임과 좋아요 정보는 서비스에서 채운다: from(comment).withAuthor(...).withLikes(...).withReplies(...)
  */

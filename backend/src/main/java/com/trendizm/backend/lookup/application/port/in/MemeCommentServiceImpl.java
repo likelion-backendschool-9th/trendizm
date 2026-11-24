@@ -48,12 +48,12 @@ public class MemeCommentServiceImpl implements MemeCommentService {
     @Override
     public PageResponse<MemeCommentResponse> getComments(Long interpretationId, Long viewerId, int page, int size) {
         requireVisibleInterpretation(interpretationId);
-        Page<MemeComment> comments = commentRepository.findByInterpretationIdAndParentIdIsNull(
+        Page<MemeComment> comments = commentRepository.findVisibleComments(
                 interpretationId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id")));
 
         List<MemeComment> replies = comments.isEmpty()
                 ? List.of()
-                : commentRepository.findByParentIdInOrderByIdAsc(comments.map(MemeComment::getId).getContent());
+                : commentRepository.findByParentIdInAndDeletedAtIsNullOrderByIdAsc(comments.map(MemeComment::getId).getContent());
 
         List<MemeComment> all = new ArrayList<>(comments.getContent());
         all.addAll(replies);
@@ -72,7 +72,8 @@ public class MemeCommentServiceImpl implements MemeCommentService {
     public MemeCommentResponse createComment(CreateMemeCommentCommand command) {
         requireVisibleInterpretation(command.interpretationId());
         if (command.parentId() != null) {
-            boolean validParent = commentRepository.findById(command.parentId())
+            // 부모를 잠가서, 부모 삭제와 답글 작성이 겹쳐 삭제된 댓글에 답글이 달리는 것을 막는다
+            boolean validParent = commentRepository.findByIdForUpdate(command.parentId())
                     .filter(parent -> parent.getInterpretationId().equals(command.interpretationId()))
                     .filter(parent -> !parent.isReply())
                     .filter(parent -> !parent.isDeleted())
@@ -102,21 +103,13 @@ public class MemeCommentServiceImpl implements MemeCommentService {
     public void deleteComment(Long commentId, Long userId) {
         MemeComment comment = getOwnComment(commentId, userId);
         commentLikeRepository.deleteByCommentId(comment.getId());
-        if (comment.isReply()) {
-            commentRepository.delete(comment);
-            removeEmptyDeletedParent(comment.getParentId());
-        } else if (commentRepository.existsByParentId(comment.getId())) {
-            // 남이 단 대댓글이 함께 사라지지 않게 흔적만 남긴다
-            comment.markDeleted();
-        } else {
-            commentRepository.delete(comment);
-        }
+        comment.markDeleted();
     }
 
     @Override
     @Transactional
     public void likeComment(Long commentId, Long userId) {
-        getVisibleComment(commentId);
+        getVisibleCommentForUpdate(commentId);
         commentLikeRepository.insertIfAbsent(commentId, userId);
     }
 
@@ -124,14 +117,6 @@ public class MemeCommentServiceImpl implements MemeCommentService {
     @Transactional
     public void unlikeComment(Long commentId, Long userId) {
         commentLikeRepository.deleteByCommentIdAndUserId(commentId, userId);
-    }
-
-    /** 흔적만 남은 부모 댓글에 대댓글이 하나도 남지 않으면 부모도 지운다 */
-    private void removeEmptyDeletedParent(Long parentId) {
-        commentRepository.findById(parentId)
-                .filter(MemeComment::isDeleted)
-                .filter(parent -> !commentRepository.existsByParentId(parent.getId()))
-                .ifPresent(commentRepository::delete);
     }
 
     /** 의견이 없거나 그 의견의 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND */
@@ -148,16 +133,19 @@ public class MemeCommentServiceImpl implements MemeCommentService {
                 .isPresent();
     }
 
-    /** 없거나, 삭제됐거나, 문서가 숨김인 댓글이면 MEME_COMMENT_NOT_FOUND */
-    private MemeComment getVisibleComment(Long commentId) {
-        return commentRepository.findById(commentId)
+    /**
+     * 댓글을 잠가서 읽는다. 없거나, 삭제됐거나, 문서가 숨김인 댓글이면 MEME_COMMENT_NOT_FOUND.
+     * 수정·삭제·좋아요가 같은 댓글에서 겹치면 차례로 처리되어, 앞의 삭제가 끝난 뒤에는 삭제된 댓글로 보인다.
+     */
+    private MemeComment getVisibleCommentForUpdate(Long commentId) {
+        return commentRepository.findByIdForUpdate(commentId)
                 .filter(comment -> !comment.isDeleted())
                 .filter(comment -> isVisibleInterpretation(comment.getInterpretationId()))
                 .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_COMMENT_NOT_FOUND));
     }
 
     private MemeComment getOwnComment(Long commentId, Long userId) {
-        MemeComment comment = getVisibleComment(commentId);
+        MemeComment comment = getVisibleCommentForUpdate(commentId);
         if (!comment.isWrittenBy(userId)) {
             throw new BusinessException(MemeErrorCode.MEME_COMMENT_FORBIDDEN);
         }

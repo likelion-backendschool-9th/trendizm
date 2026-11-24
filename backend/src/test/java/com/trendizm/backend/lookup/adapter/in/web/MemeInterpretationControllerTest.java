@@ -83,6 +83,38 @@ class MemeInterpretationControllerTest {
     }
 
     @Test
+    @DisplayName("단어·뜻·내용이 보이지 않는 글자만 있거나, 단어·뜻·내용·제목에 NULL 같은 제어 문자가 있으면 400 INVALID_INPUT")
+    void 보이지_않는_글과_제어_문자() throws Exception {
+        String template = "{\"word\":\"%s\",\"meaning\":\"%s\",\"content\":\"%s\","
+                + "\"sourceUrl\":\"https://example.com/1\",\"title\":\"%s\"}";
+        List<String> bad = List.of("\\u3164", "\\u200B", "\\u00A0\\u3000", "\\u2800", "내용\\u0000", "\\u0007경고", "a\\u001Bb");
+        for (String value : bad) {
+            for (String body : List.of(
+                    template.formatted(value, "뜻", "내용", "제목"),
+                    template.formatted("TMI", value, "내용", "제목"),
+                    template.formatted("TMI", "뜻", value, "제목"))) {
+                mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON).content(body))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+            }
+            for (String body : List.of(
+                    "{\"meaning\":\"" + value + "\",\"content\":\"내용\"}",
+                    "{\"meaning\":\"뜻\",\"content\":\"" + value + "\"}")) {
+                mockMvc.perform(post(LIST, 3L).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON).content(body))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+            }
+        }
+        for (String control : List.of("내용\\u0000", "\\u0007경고", "a\\u001Bb")) {
+            mockMvc.perform(post(CREATE).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                            .content(template.formatted("TMI", "뜻", "내용", control)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        }
+        verifyNoInteractions(interpretationService);
+    }
+
+    @Test
     @DisplayName("출처·썸네일 주소가 http(s)://가 아니면 400 INVALID_INPUT (javascript: 주소로 XSS 방지)")
     void 잘못된_주소() throws Exception {
         for (String field : List.of("sourceUrl", "thumbnailUrl")) {

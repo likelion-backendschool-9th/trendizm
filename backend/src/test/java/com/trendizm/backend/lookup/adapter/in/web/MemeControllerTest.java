@@ -114,6 +114,18 @@ class MemeControllerTest {
     }
 
     @Test
+    @DisplayName("q나 keyword에 NULL 같은 제어 문자가 있으면 400 INVALID_INPUT")
+    void 제어_문자_검색어() throws Exception {
+        mockMvc.perform(get("/api/lookup/memes").param("q", "TMI\u0000"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        mockMvc.perform(get("/api/lookup/memes").param("keyword", "\u0000"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verifyNoInteractions(memeService);
+    }
+
+    @Test
     @DisplayName("목록은 keyword와 페이지 값을 서비스에 넘긴다")
     void 목록() throws Exception {
         given(memeService.getMemes("알", 1, 10))

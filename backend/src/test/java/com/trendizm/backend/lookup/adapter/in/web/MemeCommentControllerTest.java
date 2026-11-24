@@ -87,6 +87,32 @@ class MemeCommentControllerTest {
     }
 
     @Test
+    @DisplayName("보이지 않는 글자(한글 채움 문자·폭 없는 공백 등)만 있거나 NULL 같은 제어 문자가 있으면 400 INVALID_INPUT")
+    void 보이지_않는_내용과_제어_문자() throws Exception {
+        for (String content : List.of("\\u3164", "\\u200B", "\\u00A0\\u3000", "\\u2800", "내용\\u0000", "\\u0007경고", "a\\u001Bb")) {
+            String body = "{\"content\":\"" + content + "\"}";
+            mockMvc.perform(post(COMMENTS, 1L).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+            mockMvc.perform(patch(COMMENT, 5L).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        }
+        verifyNoInteractions(commentService);
+    }
+
+    @Test
+    @DisplayName("줄바꿈·탭은 내용에 쓸 수 있다")
+    void 줄바꿈_내용() throws Exception {
+        given(commentService.createComment(new CreateMemeCommentCommand(1L, null, 7L, "첫 줄\n\t둘째 줄")))
+                .willReturn(COMMENT_RESPONSE);
+
+        mockMvc.perform(post(COMMENTS, 1L).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"첫 줄\\n\\t둘째 줄\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     @DisplayName("로그인하면 댓글을 고치고(200) 지우고(204) 좋아요·취소(204)할 수 있다")
     void 수정_삭제_좋아요() throws Exception {
         given(commentService.updateComment(new UpdateMemeCommentCommand(5L, 7L, "고친 내용"))).willReturn(COMMENT_RESPONSE);

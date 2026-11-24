@@ -11,6 +11,7 @@ import com.trendizm.backend.lookup.application.dto.MemeCommentResponse;
 import com.trendizm.backend.lookup.application.dto.UpdateMemeCommentCommand;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
 import com.trendizm.backend.lookup.application.port.MemeCommentService;
+import com.trendizm.backend.lookup.application.port.out.MemeCommentLikeRepository;
 import com.trendizm.backend.lookup.application.port.out.MemeCommentRepository;
 import com.trendizm.backend.lookup.application.port.out.MemeInterpretationRepository;
 import com.trendizm.backend.lookup.application.port.out.MemeRepository;
@@ -42,6 +43,9 @@ class MemeCommentServiceTest {
 
     @Autowired
     private MemeCommentRepository commentRepository;
+
+    @Autowired
+    private MemeCommentLikeRepository commentLikeRepository;
 
     @Autowired
     private MemberService memberService;
@@ -182,7 +186,7 @@ class MemeCommentServiceTest {
     }
 
     @Test
-    @DisplayName("대댓글이 없는 댓글을 지우면 목록에서 사라지고, 남의 댓글은 지울 수 없다")
+    @DisplayName("댓글을 지우면 행은 남고(논리 삭제) 좋아요는 지워진다. 대댓글이 없으면 목록에서 빠지고, 남의 댓글은 지울 수 없다")
     void 댓글_삭제() {
         MemeCommentResponse target = comment(writer, "댓글");
         commentService.likeComment(target.id(), reader);
@@ -191,11 +195,15 @@ class MemeCommentServiceTest {
         commentService.deleteComment(target.id(), writer);
 
         assertThat(comments(null)).isEmpty();
-        assertThat(commentRepository.findById(target.id())).isEmpty();
+        assertThat(commentRepository.findById(target.id())).hasValueSatisfying(saved -> {
+            assertThat(saved.isDeleted()).isTrue();
+            assertThat(saved.getContent()).isEqualTo("댓글");
+        });
+        assertThat(commentLikeRepository.countGroupByCommentId(List.of(target.id()))).isEmpty();
     }
 
     @Test
-    @DisplayName("대댓글이 있는 댓글을 지우면 '삭제된 댓글'로 흔적만 남고 대댓글은 그대로다. 그 댓글은 수정·좋아요·답글이 안 된다")
+    @DisplayName("대댓글이 있는 댓글을 지우면 '삭제된 댓글'로 남고 대댓글은 그대로다. 그 댓글은 수정·좋아요·답글·삭제가 안 된다")
     void 대댓글_있는_댓글_삭제() {
         MemeCommentResponse parent = comment(writer, "지울 댓글");
         MemeCommentResponse child = reply(parent.id(), reader, "남의 답글");
@@ -219,7 +227,7 @@ class MemeCommentServiceTest {
     }
 
     @Test
-    @DisplayName("흔적만 남은 댓글의 마지막 대댓글을 지우면 그 댓글도 함께 지워진다")
+    @DisplayName("삭제된 댓글은 살아 있는 대댓글이 없어지면 목록에서 빠지지만, 댓글·대댓글 행은 모두 남는다")
     void 마지막_대댓글_삭제() {
         MemeCommentResponse parent = comment(writer, "지울 댓글");
         MemeCommentResponse first = reply(parent.id(), reader, "답글 1");
@@ -234,11 +242,14 @@ class MemeCommentServiceTest {
 
         commentService.deleteComment(second.id(), writer);
         assertThat(comments(null)).isEmpty();
-        assertThat(commentRepository.findById(parent.id())).isEmpty();
+        assertThat(commentService.getComments(interpretationId, null, 0, 20).totalElements()).isZero();
+        for (Long id : List.of(parent.id(), first.id(), second.id())) {
+            assertThat(commentRepository.findById(id)).hasValueSatisfying(saved -> assertThat(saved.isDeleted()).isTrue());
+        }
     }
 
     @Test
-    @DisplayName("삭제 표시되지 않은 댓글의 대댓글을 지우면 대댓글만 사라진다")
+    @DisplayName("삭제되지 않은 댓글의 대댓글을 지우면 대댓글만 목록에서 빠지고 행은 남는다")
     void 대댓글_삭제() {
         MemeCommentResponse parent = comment(writer, "댓글");
         MemeCommentResponse child = reply(parent.id(), reader, "답글");
@@ -249,5 +260,7 @@ class MemeCommentServiceTest {
             assertThat(shown.deleted()).isFalse();
             assertThat(shown.replies()).isEmpty();
         });
+        assertThat(commentRepository.findById(child.id())).hasValueSatisfying(saved -> assertThat(saved.isDeleted()).isTrue());
+        assertError(() -> commentService.deleteComment(child.id(), reader), MemeErrorCode.MEME_COMMENT_NOT_FOUND);
     }
 }
