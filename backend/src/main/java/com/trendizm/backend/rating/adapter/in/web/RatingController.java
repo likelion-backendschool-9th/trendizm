@@ -10,6 +10,7 @@ import com.trendizm.backend.rating.application.dto.RatingReviewQuery;
 import com.trendizm.backend.rating.application.dto.RatingReviewResponse;
 import com.trendizm.backend.rating.application.dto.RatingReviewSaveResult;
 import com.trendizm.backend.rating.application.exception.RatingErrorCode;
+import com.trendizm.backend.rating.application.port.RatingContentSort;
 import com.trendizm.backend.rating.application.port.RatingService;
 import com.trendizm.backend.rating.application.port.ReviewSort;
 import com.trendizm.backend.rating.domain.enums.RatingContentCategory;
@@ -52,15 +53,18 @@ public class RatingController {
     private final RatingService ratingService;
 
     /**
-     * 콘텐츠 목록 (최신 등록순). category·subcategory·status는 slug 값(예: media, drama, ongoing)이고
+     * 콘텐츠 목록. category·subcategory·status는 slug 값(예: media, drama, ongoing)이고
      * 보내지 않거나 빈 값(?category=)이면 전체다.
-     * 없는 slug면 RATING_INVALID_CATEGORY·RATING_INVALID_STATUS
+     * 없는 slug면 RATING_INVALID_CATEGORY·RATING_INVALID_STATUS.
+     * sort는 latest(기본, 최신 등록순)·reviews(후기 많은 순)·likes(좋아요 많은 순)·dislikes(싫어요 많은 순)·score(평균 별점 순),
+     * 없는 값이면 RATING_INVALID_SORT. 콘텐츠마다 좋아요·싫어요 후기를 공감 많은 순 2개씩 미리보기로 담는다
      */
     @GetMapping
     public PageResponse<RatingContentSummaryResponse> getContents(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String subcategory,
             @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
@@ -74,8 +78,10 @@ public class RatingController {
         RatingContentStatus parsedStatus = isBlank(status) ? null
                 : RatingContentStatus.fromSlug(status.strip())
                         .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_STATUS));
+        RatingContentSort parsedSort = RatingContentSort.fromSlug(sort.strip())
+                .orElseThrow(() -> new BusinessException(RatingErrorCode.RATING_INVALID_SORT));
         return ratingService.getContents(
-                new RatingContentQuery(parsedCategory, parsedSubcategory, parsedStatus, page, size));
+                new RatingContentQuery(parsedCategory, parsedSubcategory, parsedStatus, parsedSort, page, size));
     }
 
     @GetMapping("/{ratingId}")

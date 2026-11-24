@@ -15,6 +15,7 @@ import com.trendizm.backend.rating.application.exception.RatingErrorCode;
 import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.port.MemberService;
 import com.trendizm.backend.point.application.port.PointService;
+import com.trendizm.backend.rating.application.port.RatingContentSort;
 import com.trendizm.backend.rating.application.port.RatingService;
 import com.trendizm.backend.rating.application.port.ReviewSort;
 import com.trendizm.backend.rating.application.port.out.RatingContentRepository;
@@ -29,7 +30,10 @@ import com.trendizm.backend.rating.domain.enums.RatingContentStatus;
 import com.trendizm.backend.rating.domain.enums.RatingContentSubcategory;
 import com.trendizm.backend.rating.domain.enums.RatingContentVisibility;
 import com.trendizm.backend.rating.domain.enums.Sentiment;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +57,9 @@ public class RatingServiceImpl implements RatingService {
     /** 후기를 처음 작성하면 주는 포인트 (팀 결정 11/20) */
     static final int REVIEW_REWARD_POINT = 10;
 
+    /** 목록 카드에 보여 줄 호/불호별 미리보기 후기 수 */
+    static final int PREVIEW_SIZE = 2;
+
     /** 탈퇴했거나 찾을 수 없는 회원의 닉네임 자리에 보여 줄 이름 */
     static final String UNKNOWN_AUTHOR = "탈퇴한 회원";
 
@@ -66,11 +73,19 @@ public class RatingServiceImpl implements RatingService {
 
     @Override
     public PageResponse<RatingContentSummaryResponse> getContents(RatingContentQuery query) {
-        Pageable pageable = PageRequest.of(query.page(), query.size(), Sort.by(Sort.Direction.DESC, "id"));
-        Page<RatingContent> contents = findPublicContents(query, pageable);
-        Map<Long, SentimentStats> stats = statsByContentId(contents.map(RatingContent::getId).getContent());
-        return PageResponse.from(contents, content -> RatingContentSummaryResponse.from(content)
-                .withStats(stats.getOrDefault(content.getId(), SentimentStats.EMPTY)));
+        Page<RatingContent> contents = query.sort() == RatingContentSort.LATEST
+                ? findPublicContents(query, PageRequest.of(query.page(), query.size(), Sort.by(Sort.Direction.DESC, "id")))
+                : findPublicContentsByAggregate(query, PageRequest.of(query.page(), query.size()));
+        List<Long> contentIds = contents.map(RatingContent::getId).getContent();
+        Map<Long, SentimentStats> stats = statsByContentId(contentIds);
+        Map<Long, Map<Sentiment, List<RatingReviewResponse>>> previews = previewsByContentId(contentIds);
+        return PageResponse.from(contents, content -> {
+            Map<Sentiment, List<RatingReviewResponse>> byContent = previews.getOrDefault(content.getId(), Map.of());
+            return RatingContentSummaryResponse.from(content)
+                    .withStats(stats.getOrDefault(content.getId(), SentimentStats.EMPTY))
+                    .withPreviews(byContent.getOrDefault(Sentiment.LIKE, List.of()),
+                            byContent.getOrDefault(Sentiment.DISLIKE, List.of()));
+        });
     }
 
     @Override
@@ -224,6 +239,45 @@ public class RatingServiceImpl implements RatingService {
 
     private static String displayName(MemberInfo member) {
         return member == null || member.withdrawn() ? UNKNOWN_AUTHOR : member.nickname();
+    }
+
+    /** 후기 수·호불호 수·평균 별점으로 정렬한 목록. 대분류·소분류가 맞지 않으면 RATING_CATEGORY_MISMATCH */
+    private Page<RatingContent> findPublicContentsByAggregate(RatingContentQuery query, Pageable pageable) {
+        if (query.category() != null && query.subcategory() != null
+                && query.subcategory().getCategory() != query.category()) {
+            throw new BusinessException(RatingErrorCode.RATING_CATEGORY_MISMATCH);
+        }
+        return switch (query.sort()) {
+            case REVIEWS -> contentRepository.findByVisibilityOrderByReviewCount(
+                    PUBLIC, query.category(), query.subcategory(), query.status(), pageable);
+            case LIKES -> contentRepository.findByVisibilityOrderBySentimentCount(
+                    PUBLIC, query.category(), query.subcategory(), query.status(), Sentiment.LIKE, pageable);
+            case DISLIKES -> contentRepository.findByVisibilityOrderBySentimentCount(
+                    PUBLIC, query.category(), query.subcategory(), query.status(), Sentiment.DISLIKE, pageable);
+            case SCORE -> contentRepository.findByVisibilityOrderByAverageScore(
+                    PUBLIC, query.category(), query.subcategory(), query.status(), pageable);
+            case LATEST -> throw new IllegalArgumentException("LATEST는 findPublicContents로 조회한다");
+        };
+    }
+
+    /** 콘텐츠별·호불호별 미리보기 후기 (공감 많은 순 PREVIEW_SIZE개). 작성자 닉네임과 공감 수도 함께 채운다 */
+    private Map<Long, Map<Sentiment, List<RatingReviewResponse>>> previewsByContentId(List<Long> contentIds) {
+        if (contentIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Rating> top = new ArrayList<>(ratingRepository.findTopLikedByContentIds(contentIds, PREVIEW_SIZE));
+        Function<Rating, RatingReviewResponse> toResponse = reviewResponses(top, null);
+        Map<Long, Map<Sentiment, List<RatingReviewResponse>>> result = new HashMap<>();
+        top.stream()
+                .map(toResponse)
+                // 쿼리 결과 순서는 보장되지 않으므로 공감 많은 순, 같으면 최신 후기 순으로 다시 정렬한다
+                .sorted(Comparator.comparingLong(RatingReviewResponse::likeCount).reversed()
+                        .thenComparing(RatingReviewResponse::id, Comparator.reverseOrder()))
+                .forEach(review -> result.computeIfAbsent(review.contentId(), id -> new EnumMap<>(Sentiment.class))
+                        .computeIfAbsent(Sentiment.fromSlug(review.sentiment().slug()).orElseThrow(),
+                                sentiment -> new ArrayList<>())
+                        .add(review));
+        return result;
     }
 
     private Page<RatingContent> findPublicContents(RatingContentQuery query, Pageable pageable) {

@@ -1,10 +1,28 @@
 import Link from "next/link";
-import type {
-  RatingReaction,
-  RatingReview,
-} from "@/app/rating/_components/RatingList";
 import Stars from "@/app/rating/_components/Stars";
 import Pagination from "@/components/Pagination";
+
+// 와이어프레임 목업 데이터 모양. 목록 화면을 API에 연결하면서 RatingList.tsx에서 옮겨 왔다.
+// TODO(rating): 상세 화면 연결 PR에서 API 응답 타입(_lib/types.ts)으로 바꾼다.
+export type RatingReview = {
+  id: number;
+  title: string;
+  score: number;
+  watched: string;
+  body: string;
+  createdAt: string;
+  likeCount: number;
+  author: { id: string; nickname: string; tags: string[] };
+};
+
+export type RatingReaction = {
+  count: number;
+  ratio: number;
+  averageScore: number;
+  // 이 반응을 주로 보인 사용자군. 예: { label: "연령", value: "20대" }
+  tags: { label: string; value: string }[];
+  reviews: RatingReview[];
+};
 
 type ReactionType = "like" | "dislike";
 

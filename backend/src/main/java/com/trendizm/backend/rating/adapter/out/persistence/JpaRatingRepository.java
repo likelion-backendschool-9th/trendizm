@@ -42,6 +42,20 @@ public interface JpaRatingRepository extends JpaRepository<Rating, Long>, Rating
             """)
     List<SentimentCount> countGroupByContentIdAndSentiment(@Param("contentIds") Collection<Long> contentIds);
 
+    /** 콘텐츠·호불호별로 공감 수 순위를 매겨(row_number) 앞의 limit개만 가져온다. 콘텐츠마다 따로 조회하지 않으려고 한 번에 묶는다 */
+    @Override
+    @Query(value = """
+            select ranked.* from (
+                select r.*, row_number() over (
+                    partition by r.content_id, r.sentiment
+                    order by (select count(*) from rating_likes l where l.rating_id = r.id) desc, r.id desc) as rn
+                from ratings r
+                where r.content_id in (:contentIds)
+            ) ranked
+            where ranked.rn <= :limit
+            """, nativeQuery = true)
+    List<Rating> findTopLikedByContentIds(@Param("contentIds") Collection<Long> contentIds, @Param("limit") int limit);
+
     @Override
     @Query(value = """
             select r from Rating r
