@@ -2,8 +2,9 @@
 // - access_token 쿠키가 있으면 Authorization: Bearer 헤더로 바꿔 붙인다. 쿠키 자체는 백엔드에 보내지 않는다.
 // - 로그인·가입·재발급은 app/api/auth/*/route.ts가 따로 처리한다(이 파일보다 먼저 맞는다).
 // - 응답은 상태 코드와 본문을 그대로 돌려준다. 백엔드에 닿지 못하면 502 NETWORK_ERROR.
+// - 다른 사이트에서 보낸 쓰기 요청은 백엔드에 보내지 않고 403 CROSS_SITE_REQUEST (lib/api/bff.ts isCrossSiteWrite).
 import type { NextRequest } from "next/server";
-import { ACCESS_TOKEN_COOKIE, BACKEND_URL, backendUnavailable } from "@/lib/api/bff";
+import { ACCESS_TOKEN_COOKIE, BACKEND_URL, backendUnavailable, crossSiteForbidden, isCrossSiteWrite } from "@/lib/api/bff";
 
 /** 브라우저 요청에서 백엔드로 넘길 헤더. 쿠키·Authorization 등 나머지는 넘기지 않는다 */
 const FORWARD_REQUEST_HEADERS = ["accept", "accept-language", "content-type"];
@@ -11,6 +12,9 @@ const FORWARD_REQUEST_HEADERS = ["accept", "accept-language", "content-type"];
 const FORWARD_RESPONSE_HEADERS = ["content-type", "content-disposition", "cache-control"];
 
 async function forward(request: NextRequest, ctx: RouteContext<"/api/[...path]">) {
+  if (isCrossSiteWrite(request)) {
+    return crossSiteForbidden();
+  }
   const { path } = await ctx.params;
   const url = `${BACKEND_URL}/api/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`;
 

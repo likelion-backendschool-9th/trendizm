@@ -5,9 +5,12 @@
 //   이때 쿠키를 지우면 먼저 성공한 탭이 저장한 새 쿠키까지 지워져 모든 탭이 로그아웃되기 때문이다.
 //   남은 쿠키가 정말 만료된 것이면 다음 요청도 401이 되어 apiFetch가 로그인 화면으로 보낸다.
 import { NextResponse, type NextRequest } from "next/server";
-import { clearAuthCookies, forwardLogin, REFRESH_TOKEN_COOKIE } from "@/lib/api/bff";
+import { clearAuthCookies, crossSiteForbidden, forwardLogin, isCrossSiteWrite, REFRESH_TOKEN_COOKIE } from "@/lib/api/bff";
 
 export async function POST(request: NextRequest) {
+  if (isCrossSiteWrite(request)) {
+    return crossSiteForbidden();
+  }
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   if (!refreshToken) {
     const response = NextResponse.json(
