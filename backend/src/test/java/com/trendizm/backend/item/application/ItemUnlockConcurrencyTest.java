@@ -7,8 +7,10 @@ import com.trendizm.backend.item.application.dto.CreateItemCommand;
 import com.trendizm.backend.item.application.dto.CreateItemQuestionCommand;
 import com.trendizm.backend.item.application.dto.ItemResponse;
 import com.trendizm.backend.item.application.port.ItemService;
+import com.trendizm.backend.item.application.port.out.ItemUnlockRepository;
 import com.trendizm.backend.item.domain.enums.ItemSubcategory;
 import com.trendizm.backend.point.application.exception.PointErrorCode;
+import com.trendizm.backend.point.application.port.PointHistoryFilter;
 import com.trendizm.backend.point.application.port.PointService;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 잠금 해제를 동시에 요청하거나 포인트가 부족할 때를 검사한다.
@@ -44,6 +47,12 @@ class ItemUnlockConcurrencyTest {
 
     @Autowired
     private PointService pointService;
+
+    @Autowired
+    private ItemUnlockRepository unlockRepository;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private Long questionId;
     private Long itemId;
@@ -90,6 +99,51 @@ class ItemUnlockConcurrencyTest {
         pointService.rewardForReview(VIEWER, 2L, 100);
         assertThat(itemService.unlockRecommendation(itemId, VIEWER).locked()).isFalse();
         assertThat(pointService.getBalance(VIEWER).balance()).isEqualTo(50);
+    }
+
+    @Test
+    @DisplayName("먼저 열람 기록을 넣은 요청이 롤백되면, 기다리던 같은 회원의 요청이 열람 기록을 넣고 결제한다")
+    void 앞_요청_롤백_후_뒤_요청_결제() throws Exception {
+        pointService.rewardForReview(VIEWER, 1L, 300);
+        CountDownLatch inserted = new CountDownLatch(1);
+        CountDownLatch rollback = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            // 앞 요청: 열람 기록을 넣은 뒤 커밋하지 않고 기다렸다가 롤백한다 (결제에서 예외가 난 경우와 같다)
+            Future<?> first = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                assertThat(unlockRepository.insertIfAbsent(itemId, VIEWER, 100)).isEqualTo(1);
+                inserted.countDown();
+                await(rollback);
+                status.setRollbackOnly();
+            }));
+            assertThat(inserted.await(10, TimeUnit.SECONDS)).isTrue();
+
+            // 뒤 요청: 같은 (item_id, user_id)라서 앞 요청이 끝날 때까지 열람 기록 추가에서 기다린다
+            Future<ItemResponse> second = executor.submit(() -> itemService.unlockRecommendation(itemId, VIEWER));
+            Thread.sleep(500);
+            assertThat(second).isNotDone();
+
+            rollback.countDown();
+            first.get(30, TimeUnit.SECONDS);
+
+            assertThat(second.get(30, TimeUnit.SECONDS).locked()).isFalse();
+        } finally {
+            executor.shutdownNow();
+        }
+        assertThat(pointService.getBalance(VIEWER).balance()).isEqualTo(200);
+        assertThat(pointService.getBalance(RECOMMENDER).balance()).isEqualTo(100);
+        assertThat(pointService.getHistories(VIEWER, PointHistoryFilter.USE, 0, 10).totalElements()).isOne();
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(30, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("대기 시간이 지났습니다.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
     }
 
     /** 모든 요청을 동시에 시작한다. 결과는 성공하면 반환값, 실패하면 그 예외 */

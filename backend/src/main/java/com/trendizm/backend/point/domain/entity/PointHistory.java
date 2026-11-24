@@ -19,9 +19,15 @@ import lombok.NoArgsConstructor;
  * point_histories 테이블. 잔액이 바뀔 때마다 한 줄씩 남기고 수정하지 않는다.
  * 참조 id는 종류마다 하나만 채운다: CHARGE·REFUND → chargeId, UNLOCK·EARN → itemUnlockId, REWARD → ratingId.
  * 다른 도메인 테이블은 id 값만 저장한다. created_at은 BaseCreatedEntity가 채운다.
+ * item_unlock_id·rating_id 인덱스는 결제·보상 전에 "이미 처리했나"를 확인하는 조회(existsBy...AndType)가
+ * 내역 전체를 읽지 않게 한다. 한 값에 해당하는 행이 최대 2개(UNLOCK·EARN)라 type은 넣지 않는다.
  */
 @Entity
-@Table(name = "point_histories", indexes = @Index(columnList = "user_id, created_at"))
+@Table(name = "point_histories", indexes = {
+        @Index(columnList = "user_id, created_at"),
+        @Index(columnList = "item_unlock_id"),
+        @Index(columnList = "rating_id")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PointHistory extends BaseCreatedEntity {
