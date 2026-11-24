@@ -4,6 +4,7 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
+import com.trendizm.backend.lookup.application.dto.MemeVoteResult;
 import com.trendizm.backend.lookup.application.dto.VoteMemeInterpretationCommand;
 
 /** 밈 의견 작성·조회·투표 */
@@ -28,10 +29,14 @@ public interface MemeInterpretationService {
 
     /**
      * 의견에 투표한다. 처음이면 저장하고, 다른 쪽에 투표해 두었으면 바꾸고, 같은 쪽이면 바뀌는 것이 없다.
-     * 자기 의견에도 투표할 수 있다. 의견이 없거나 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND
+     * 자기 의견에도 투표할 수 있다. 의견이 없거나 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND.
+     * 결과의 수와 myVote는 처리 후 DB에서 읽은 값이다
      */
-    MemeInterpretationResponse vote(VoteMemeInterpretationCommand command);
+    MemeVoteResult vote(VoteMemeInterpretationCommand command);
 
-    /** 투표를 취소한다. 투표하지 않았으면 바뀌는 것이 없다. 의견이 없거나 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND */
-    MemeInterpretationResponse cancelVote(Long interpretationId, Long userId);
+    /**
+     * 투표를 취소한다. 투표하지 않았으면 바뀌는 것이 없다. 의견이 없거나 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND.
+     * 결과의 수와 myVote는 처리 후 DB에서 읽은 값이다
+     */
+    MemeVoteResult cancelVote(Long interpretationId, Long userId);
 }

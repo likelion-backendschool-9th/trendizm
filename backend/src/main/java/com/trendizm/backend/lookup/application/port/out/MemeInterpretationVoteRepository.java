@@ -20,8 +20,9 @@ public interface MemeInterpretationVoteRepository {
     /** 지금 투표가 type일 때만 지운다 */
     int deleteByInterpretationIdAndUserIdAndType(Long interpretationId, Long userId, MemeVoteType type);
 
-    Optional<MemeInterpretationVote> findByInterpretationIdAndUserId(Long interpretationId, Long userId);
+    /** 이 회원의 이 의견 투표. 엔티티를 거치지 않아 항상 DB 값이 나온다 */
+    Optional<MyVote> findMyVote(Long interpretationId, Long userId);
 
-    /** 목록에 내 투표(myVote)를 표시할 때 쓴다 */
-    List<MemeInterpretationVote> findByUserIdAndInterpretationIdIn(Long userId, Collection<Long> interpretationIds);
+    /** 목록·투표 응답에 내 투표(myVote)를 표시할 때 쓴다. 엔티티를 거치지 않아 항상 DB 값이 나온다 */
+    List<MyVote> findMyVotes(Long userId, Collection<Long> interpretationIds);
 }

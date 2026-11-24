@@ -5,6 +5,7 @@ import com.trendizm.backend.lookup.adapter.in.web.dto.AddMemeInterpretationReque
 import com.trendizm.backend.lookup.adapter.in.web.dto.CreateMemeInterpretationRequest;
 import com.trendizm.backend.lookup.adapter.in.web.dto.VoteMemeInterpretationRequest;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
+import com.trendizm.backend.lookup.application.dto.MemeVoteResult;
 import com.trendizm.backend.lookup.application.port.MemeInterpretationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -70,9 +71,9 @@ public class MemeInterpretationController {
         return interpretationService.createInterpretation(request.toCommand(userId));
     }
 
-    /** 투표. 처음이면 저장, 다른 쪽이면 변경, 같은 쪽이면 그대로. 바뀐 찬성·반대 수와 myVote를 돌려준다 */
+    /** 투표. 처음이면 저장, 다른 쪽이면 변경, 같은 쪽이면 그대로. 처리 후의 찬성·반대 수와 myVote를 돌려준다 */
     @PutMapping("/interpretations/{interpretationId}/vote")
-    public MemeInterpretationResponse vote(
+    public MemeVoteResult vote(
             @PathVariable Long interpretationId,
             @AuthenticationPrincipal(expression = "id") Long userId,
             @Valid @RequestBody VoteMemeInterpretationRequest request) {
@@ -81,7 +82,7 @@ public class MemeInterpretationController {
 
     /** 투표 취소. 투표하지 않았어도 성공이다 */
     @DeleteMapping("/interpretations/{interpretationId}/vote")
-    public MemeInterpretationResponse cancelVote(
+    public MemeVoteResult cancelVote(
             @PathVariable Long interpretationId,
             @AuthenticationPrincipal(expression = "id") Long userId) {
         return interpretationService.cancelVote(interpretationId, userId);

@@ -17,6 +17,7 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
+import com.trendizm.backend.lookup.application.dto.MemeVoteResult;
 import com.trendizm.backend.lookup.application.dto.VoteMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
 import com.trendizm.backend.lookup.application.port.MemeInterpretationService;
@@ -184,12 +185,16 @@ class MemeInterpretationControllerTest {
     @DisplayName("로그인하면 투표할 수 있다. 종류는 대소문자를 무시한다")
     void 투표() throws Exception {
         given(interpretationService.vote(new VoteMemeInterpretationCommand(1L, 7L, MemeVoteType.DISAGREE)))
-                .willReturn(INTERPRETATION.withMyVote("disagree"));
+                .willReturn(new MemeVoteResult(1L, 2, 3, "disagree"));
 
         mockMvc.perform(put(VOTE, 1L).with(user(LOGIN_USER)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"Disagree\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.myVote").value("disagree"));
+                .andExpect(jsonPath("$.interpretationId").value(1))
+                .andExpect(jsonPath("$.agreeCount").value(2))
+                .andExpect(jsonPath("$.disagreeCount").value(3))
+                .andExpect(jsonPath("$.myVote").value("disagree"))
+                .andExpect(jsonPath("$.content").doesNotExist());
     }
 
     @Test
@@ -205,7 +210,7 @@ class MemeInterpretationControllerTest {
     @Test
     @DisplayName("로그인하면 투표를 취소할 수 있다")
     void 투표_취소() throws Exception {
-        given(interpretationService.cancelVote(1L, 7L)).willReturn(INTERPRETATION);
+        given(interpretationService.cancelVote(1L, 7L)).willReturn(new MemeVoteResult(1L, 2, 2, null));
 
         mockMvc.perform(delete(VOTE, 1L).with(user(LOGIN_USER)))
                 .andExpect(status().isOk())

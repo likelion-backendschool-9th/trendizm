@@ -1,8 +1,12 @@
 package com.trendizm.backend.lookup.adapter.out.persistence;
 
 import com.trendizm.backend.lookup.application.port.out.MemeInterpretationVoteRepository;
+import com.trendizm.backend.lookup.application.port.out.MyVote;
 import com.trendizm.backend.lookup.domain.entity.MemeInterpretationVote;
 import com.trendizm.backend.lookup.domain.enums.MemeVoteType;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -43,4 +47,21 @@ public interface JpaMemeInterpretationVoteRepository
             """)
     int deleteByInterpretationIdAndUserIdAndType(@Param("interpretationId") Long interpretationId,
                                                  @Param("userId") Long userId, @Param("type") MemeVoteType type);
+
+    @Override
+    @Query("""
+            select new com.trendizm.backend.lookup.application.port.out.MyVote(v.interpretationId, v.type)
+            from MemeInterpretationVote v
+            where v.interpretationId = :interpretationId and v.userId = :userId
+            """)
+    Optional<MyVote> findMyVote(@Param("interpretationId") Long interpretationId, @Param("userId") Long userId);
+
+    @Override
+    @Query("""
+            select new com.trendizm.backend.lookup.application.port.out.MyVote(v.interpretationId, v.type)
+            from MemeInterpretationVote v
+            where v.userId = :userId and v.interpretationId in :interpretationIds
+            """)
+    List<MyVote> findMyVotes(@Param("userId") Long userId,
+                             @Param("interpretationIds") Collection<Long> interpretationIds);
 }

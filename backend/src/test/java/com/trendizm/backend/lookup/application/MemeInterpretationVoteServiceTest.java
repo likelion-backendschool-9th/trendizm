@@ -5,22 +5,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
+import com.trendizm.backend.lookup.application.dto.MemeVoteResult;
 import com.trendizm.backend.lookup.application.dto.VoteMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
 import com.trendizm.backend.lookup.application.port.MemeInterpretationService;
 import com.trendizm.backend.lookup.application.port.out.MemeInterpretationRepository;
 import com.trendizm.backend.lookup.application.port.out.MemeInterpretationVoteRepository;
 import com.trendizm.backend.lookup.application.port.out.MemeRepository;
+import com.trendizm.backend.lookup.application.port.out.MyVote;
 import com.trendizm.backend.lookup.domain.entity.Meme;
 import com.trendizm.backend.lookup.domain.entity.MemeInterpretation;
-import com.trendizm.backend.lookup.domain.entity.MemeInterpretationVote;
 import com.trendizm.backend.lookup.domain.enums.MemeVoteType;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -43,6 +46,13 @@ class MemeInterpretationVoteServiceTest {
     @Autowired
     private MemeInterpretationVoteRepository voteRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    /** 같은 트랜잭션에서 JPA를 거치지 않고 DB를 바꿔, 다른 요청이 그사이 바꾼 상황을 만든다 */
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private Long memeId;
     private Long interpretationId;
     private Long hiddenInterpretationId;
@@ -61,15 +71,16 @@ class MemeInterpretationVoteServiceTest {
                 MemeInterpretation.create(hiddenMemeId, WRITER, "숨김 의견", "내용")).getId();
     }
 
-    private MemeInterpretationResponse vote(Long userId, MemeVoteType type) {
+    private MemeVoteResult vote(Long userId, MemeVoteType type) {
         return interpretationService.vote(new VoteMemeInterpretationCommand(interpretationId, userId, type));
     }
 
     @Test
     @DisplayName("처음 투표하면 그쪽 수가 1 늘고 myVote에 내 투표가 나온다")
     void 처음_투표() {
-        MemeInterpretationResponse response = vote(VOTER, MemeVoteType.AGREE);
+        MemeVoteResult response = vote(VOTER, MemeVoteType.AGREE);
 
+        assertThat(response.interpretationId()).isEqualTo(interpretationId);
         assertThat(response.agreeCount()).isEqualTo(1);
         assertThat(response.disagreeCount()).isZero();
         assertThat(response.myVote()).isEqualTo("agree");
@@ -80,7 +91,7 @@ class MemeInterpretationVoteServiceTest {
     void 같은_쪽_재투표() {
         vote(VOTER, MemeVoteType.AGREE);
 
-        MemeInterpretationResponse response = vote(VOTER, MemeVoteType.AGREE);
+        MemeVoteResult response = vote(VOTER, MemeVoteType.AGREE);
 
         assertThat(response.agreeCount()).isEqualTo(1);
         assertThat(response.myVote()).isEqualTo("agree");
@@ -92,19 +103,19 @@ class MemeInterpretationVoteServiceTest {
         vote(VOTER, MemeVoteType.AGREE);
         vote(OTHER_VOTER, MemeVoteType.AGREE);
 
-        MemeInterpretationResponse response = vote(VOTER, MemeVoteType.DISAGREE);
+        MemeVoteResult response = vote(VOTER, MemeVoteType.DISAGREE);
 
         assertThat(response.agreeCount()).isEqualTo(1);
         assertThat(response.disagreeCount()).isEqualTo(1);
         assertThat(response.myVote()).isEqualTo("disagree");
-        assertThat(voteRepository.findByInterpretationIdAndUserId(interpretationId, VOTER))
-                .get().extracting(MemeInterpretationVote::getType).isEqualTo(MemeVoteType.DISAGREE);
+        assertThat(voteRepository.findMyVote(interpretationId, VOTER))
+                .get().extracting(MyVote::type).isEqualTo(MemeVoteType.DISAGREE);
     }
 
     @Test
     @DisplayName("자기 의견에도 투표할 수 있다")
     void 자기_의견_투표() {
-        MemeInterpretationResponse response = vote(WRITER, MemeVoteType.AGREE);
+        MemeVoteResult response = vote(WRITER, MemeVoteType.AGREE);
 
         assertThat(response.agreeCount()).isEqualTo(1);
     }
@@ -114,13 +125,13 @@ class MemeInterpretationVoteServiceTest {
     void 투표_취소() {
         vote(VOTER, MemeVoteType.DISAGREE);
 
-        MemeInterpretationResponse canceled = interpretationService.cancelVote(interpretationId, VOTER);
-        MemeInterpretationResponse again = interpretationService.cancelVote(interpretationId, VOTER);
+        MemeVoteResult canceled = interpretationService.cancelVote(interpretationId, VOTER);
+        MemeVoteResult again = interpretationService.cancelVote(interpretationId, VOTER);
 
         assertThat(canceled.disagreeCount()).isZero();
         assertThat(canceled.myVote()).isNull();
         assertThat(again.disagreeCount()).isZero();
-        assertThat(voteRepository.findByInterpretationIdAndUserId(interpretationId, VOTER)).isEmpty();
+        assertThat(voteRepository.findMyVote(interpretationId, VOTER)).isEmpty();
     }
 
     @Test
@@ -150,5 +161,28 @@ class MemeInterpretationVoteServiceTest {
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND);
         }
+    }
+
+    @Test
+    @DisplayName("바뀐 행이 없어도 응답의 수와 myVote는 트랜잭션에서 먼저 읽은 엔티티가 아니라 DB 값이다")
+    void 응답은_DB_값() {
+        vote(VOTER, MemeVoteType.AGREE);
+        // 의견과 투표 엔티티를 영속성 컨텍스트에 올려 둔다 (예전 방식은 이 엔티티를 그대로 응답에 썼다)
+        entityManager.flush();
+        entityManager.clear();
+        entityManager.find(MemeInterpretation.class, interpretationId);
+        entityManager.createQuery("select v from MemeInterpretationVote v").getResultList();
+        // 그사이 다른 요청이 내 투표를 비동의로 바꾸고 수도 바뀐 상황
+        jdbcTemplate.update("UPDATE meme_interpretation_votes SET type = 'DISAGREE' WHERE interpretation_id = ?",
+                interpretationId);
+        jdbcTemplate.update("UPDATE meme_interpretations SET agree_count = 0, disagree_count = 4 WHERE id = ?",
+                interpretationId);
+
+        // 이미 비동의라 바뀌는 행이 없다
+        MemeVoteResult response = vote(VOTER, MemeVoteType.DISAGREE);
+
+        assertThat(response.agreeCount()).isZero();
+        assertThat(response.disagreeCount()).isEqualTo(4);
+        assertThat(response.myVote()).isEqualTo("disagree");
     }
 }
