@@ -5,17 +5,24 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
+import com.trendizm.backend.lookup.application.dto.MemeVoteResult;
+import com.trendizm.backend.lookup.application.dto.VoteMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
 import com.trendizm.backend.lookup.application.port.MemeInterpretationService;
 import com.trendizm.backend.lookup.application.port.out.MemeInterpretationRepository;
+import com.trendizm.backend.lookup.application.port.out.MemeInterpretationVoteRepository;
 import com.trendizm.backend.lookup.application.port.out.MemeRepository;
+import com.trendizm.backend.lookup.application.port.out.MyVote;
+import com.trendizm.backend.lookup.application.port.out.VoteCounts;
 import com.trendizm.backend.lookup.domain.entity.Meme;
 import com.trendizm.backend.lookup.domain.entity.MemeInterpretation;
+import com.trendizm.backend.lookup.domain.enums.MemeVoteType;
 import com.trendizm.backend.lookup.domain.vo.SourceUrl;
 import com.trendizm.backend.member.application.dto.MemberInfo;
 import com.trendizm.backend.member.application.port.MemberService;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -37,6 +44,7 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
 
     private final MemeRepository memeRepository;
     private final MemeInterpretationRepository interpretationRepository;
+    private final MemeInterpretationVoteRepository voteRepository;
     private final MemberService memberService;
 
     /** 문서 생성과 의견 저장이 한 트랜잭션이라, 의견 저장이 실패하면 새 문서도 롤백되어 빈 문서가 남지 않는다 */
@@ -92,17 +100,73 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     }
 
     @Override
-    public PageResponse<MemeInterpretationResponse> getInterpretations(Long memeId, int page, int size) {
+    public PageResponse<MemeInterpretationResponse> getInterpretations(Long memeId, Long viewerId, int page, int size) {
         Meme meme = memeRepository.findById(memeId)
                 .filter(found -> !found.isHidden())
                 .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
         Page<MemeInterpretation> interpretations =
                 interpretationRepository.findByMemeIdOrderByTrust(meme.getId(), PageRequest.of(page, size));
-        Map<Long, String> nicknames = nicknames(
-                interpretations.getContent().stream().map(MemeInterpretation::getUserId).toList());
+        List<MemeInterpretation> content = interpretations.getContent();
+        Map<Long, String> nicknames = nicknames(content.stream().map(MemeInterpretation::getUserId).toList());
+        Map<Long, String> myVotes = myVotes(viewerId, content.stream().map(MemeInterpretation::getId).toList());
         return PageResponse.from(interpretations,
                 interpretation -> MemeInterpretationResponse.from(interpretation)
-                        .withAuthor(nicknames.get(interpretation.getUserId())));
+                        .withAuthor(nicknames.get(interpretation.getUserId()))
+                        .withMyVote(myVotes.get(interpretation.getId())));
+    }
+
+    /**
+     * 투표 수는 실제로 바뀐 행이 있을 때만 고친다(insertIfAbsent·changeType의 반환값).
+     * 그래서 같은 사람이 동시에 여러 번 보내도 수가 한 번만 바뀐다.
+     */
+    @Override
+    @Transactional
+    public MemeVoteResult vote(VoteMemeInterpretationCommand command) {
+        Long interpretationId = getVisibleInterpretation(command.interpretationId()).getId();
+        MemeVoteType type = command.type();
+        boolean agree = type == MemeVoteType.AGREE;
+        if (voteRepository.insertIfAbsent(interpretationId, command.userId(), type.name()) == 1) {
+            interpretationRepository.addVoteCounts(interpretationId, agree ? 1 : 0, agree ? 0 : 1);
+        } else if (voteRepository.changeType(interpretationId, command.userId(), type) == 1) {
+            interpretationRepository.addVoteCounts(interpretationId, agree ? 1 : -1, agree ? -1 : 1);
+        }
+        return currentState(interpretationId, command.userId());
+    }
+
+    @Override
+    @Transactional
+    public MemeVoteResult cancelVote(Long interpretationId, Long userId) {
+        Long id = getVisibleInterpretation(interpretationId).getId();
+        voteRepository.findMyVote(id, userId).ifPresent(vote -> {
+            boolean agree = vote.type() == MemeVoteType.AGREE;
+            // 조회한 뒤 다른 요청이 먼저 지우거나 바꿨으면 0이 나오고 수를 고치지 않는다
+            if (voteRepository.deleteByInterpretationIdAndUserIdAndType(id, userId, vote.type()) == 1) {
+                interpretationRepository.addVoteCounts(id, agree ? -1 : 0, agree ? 0 : -1);
+            }
+        });
+        return currentState(id, userId);
+    }
+
+    /** 의견이 없거나 그 의견의 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND */
+    private MemeInterpretation getVisibleInterpretation(Long interpretationId) {
+        MemeInterpretation interpretation = interpretationRepository.findById(interpretationId)
+                .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
+        boolean visible = memeRepository.findById(interpretation.getMemeId()).filter(meme -> !meme.isHidden()).isPresent();
+        if (!visible) {
+            throw new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND);
+        }
+        return interpretation;
+    }
+
+    /**
+     * 처리 후의 수와 내 투표. 엔티티 대신 projection으로 읽어서, 바뀐 행이 없어 영속성 컨텍스트가 비워지지 않았거나
+     * 그사이 다른 요청이 투표를 바꿨어도 트랜잭션 초반에 읽은 값이 아니라 DB 값을 돌려준다
+     */
+    private MemeVoteResult currentState(Long interpretationId, Long userId) {
+        VoteCounts counts = interpretationRepository.findVoteCountsById(interpretationId)
+                .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
+        String myVote = voteRepository.findMyVote(interpretationId, userId).map(vote -> vote.type().slug()).orElse(null);
+        return new MemeVoteResult(interpretationId, counts.agreeCount(), counts.disagreeCount(), myVote);
     }
 
     /** 회원 id → 닉네임. 목록의 작성자를 한 번에 가져온다. 탈퇴했거나 없는 회원은 UNKNOWN_AUTHOR */
@@ -117,5 +181,14 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
 
     private static String displayName(MemberInfo member) {
         return member == null || member.withdrawn() ? UNKNOWN_AUTHOR : member.nickname();
+    }
+
+    /** 의견 id → 내 투표 slug. 비로그인이거나 투표하지 않은 의견은 없다 */
+    private Map<Long, String> myVotes(Long viewerId, Collection<Long> interpretationIds) {
+        if (viewerId == null || interpretationIds.isEmpty()) {
+            return Map.of();
+        }
+        return voteRepository.findMyVotes(viewerId, interpretationIds).stream()
+                .collect(Collectors.toMap(MyVote::interpretationId, vote -> vote.type().slug()));
     }
 }

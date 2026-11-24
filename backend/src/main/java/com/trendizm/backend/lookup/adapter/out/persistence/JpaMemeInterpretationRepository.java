@@ -1,10 +1,13 @@
 package com.trendizm.backend.lookup.adapter.out.persistence;
 
 import com.trendizm.backend.lookup.application.port.out.MemeInterpretationRepository;
+import com.trendizm.backend.lookup.application.port.out.VoteCounts;
 import com.trendizm.backend.lookup.domain.entity.MemeInterpretation;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -20,4 +23,23 @@ public interface JpaMemeInterpretationRepository
             order by (i.agreeCount - i.disagreeCount) desc, i.createdAt desc, i.id desc
             """)
     Page<MemeInterpretation> findByMemeIdOrderByTrust(@Param("memeId") Long memeId, Pageable pageable);
+
+    /** 바꾼 뒤 영속성 컨텍스트를 비워서, 같은 트랜잭션에 남아 있던 엔티티가 옛 수를 들고 있지 않게 한다 */
+    @Override
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update MemeInterpretation i
+            set i.agreeCount = i.agreeCount + :agreeDelta, i.disagreeCount = i.disagreeCount + :disagreeDelta
+            where i.id = :id
+            """)
+    void addVoteCounts(@Param("id") Long id, @Param("agreeDelta") int agreeDelta,
+                       @Param("disagreeDelta") int disagreeDelta);
+
+    @Override
+    @Query("""
+            select new com.trendizm.backend.lookup.application.port.out.VoteCounts(i.agreeCount, i.disagreeCount)
+            from MemeInterpretation i
+            where i.id = :id
+            """)
+    Optional<VoteCounts> findVoteCountsById(@Param("id") Long id);
 }

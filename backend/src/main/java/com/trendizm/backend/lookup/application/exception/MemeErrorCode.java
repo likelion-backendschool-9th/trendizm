@@ -12,6 +12,12 @@ public enum MemeErrorCode implements ErrorCode {
     /** 보이지 않는 문자(폭 없는 공백, 한글 채움 문자 등)만 있어서 normalizeWord로 바꾸면 빈 단어 */
     MEME_WORD_BLANK(HttpStatus.BAD_REQUEST, "단어를 입력해 주세요."),
 
+    /** 의견이 없거나 그 의견의 문서가 숨김 상태 */
+    MEME_INTERPRETATION_NOT_FOUND(HttpStatus.NOT_FOUND, "의견을 찾을 수 없습니다."),
+
+    /** 투표 종류가 agree, disagree가 아님 */
+    MEME_INVALID_VOTE_TYPE(HttpStatus.BAD_REQUEST, "투표 종류는 agree 또는 disagree여야 합니다."),
+
     /** normalizeWord로 바꾼 단어가 word 칼럼 길이(100자)를 넘음. 예: "İ"는 소문자로 바꾸면 2글자가 된다 */
     MEME_WORD_TOO_LONG(HttpStatus.BAD_REQUEST, "단어가 너무 깁니다. 100자 이하로 입력해 주세요."),
 
