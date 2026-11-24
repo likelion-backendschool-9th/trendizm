@@ -21,6 +21,7 @@ import com.trendizm.backend.rating.application.dto.RatingReviewQuery;
 import com.trendizm.backend.rating.application.dto.RatingReviewResponse;
 import com.trendizm.backend.rating.application.dto.RatingReviewSaveResult;
 import com.trendizm.backend.rating.application.dto.SaveRatingReviewCommand;
+import com.trendizm.backend.rating.application.port.RatingContentSort;
 import com.trendizm.backend.rating.application.port.RatingService;
 import com.trendizm.backend.rating.application.port.ReviewSort;
 import com.trendizm.backend.rating.domain.entity.Rating;
@@ -110,6 +111,20 @@ class RatingControllerTest {
 
         mockMvc.perform(get("/api/ratings").param("category", "").param("subcategory", " ").param("status", ""))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("콘텐츠 목록 정렬은 slug(dislikes)로 받고, 없는 값이면 400 RATING_INVALID_SORT")
+    void 콘텐츠_정렬() throws Exception {
+        given(ratingService.getContents(new RatingContentQuery(null, null, null, RatingContentSort.DISLIKES, 0, 20)))
+                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+
+        mockMvc.perform(get("/api/ratings").param("sort", "dislikes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(20));
+        mockMvc.perform(get("/api/ratings").param("sort", "DISLIKES"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RATING_INVALID_SORT"));
     }
 
     @Test

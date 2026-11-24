@@ -8,9 +8,11 @@ import com.trendizm.backend.global.error.ErrorCode;
 import com.trendizm.backend.rating.application.dto.RatingContentQuery;
 import com.trendizm.backend.rating.application.dto.RatingContentResponse;
 import com.trendizm.backend.rating.application.dto.RatingContentSummaryResponse;
+import com.trendizm.backend.rating.application.dto.RatingReviewResponse;
 import com.trendizm.backend.rating.application.dto.RegisterRatingContentCommand;
 import com.trendizm.backend.rating.application.dto.SentimentStats;
 import com.trendizm.backend.rating.application.exception.RatingErrorCode;
+import com.trendizm.backend.rating.application.port.RatingContentSort;
 import com.trendizm.backend.rating.application.port.RatingService;
 import com.trendizm.backend.rating.application.port.out.RatingRepository;
 import com.trendizm.backend.rating.domain.entity.Rating;
@@ -19,6 +21,7 @@ import com.trendizm.backend.rating.domain.enums.RatingContentStatus;
 import com.trendizm.backend.rating.domain.enums.RatingContentSubcategory;
 import com.trendizm.backend.rating.domain.enums.Sentiment;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
@@ -45,8 +48,13 @@ class RatingServiceTest {
                 "설명", "https://img.test/a.jpg", 15, LocalDate.of(2026, 11, 1), null)).id();
     }
 
-    private void review(Long contentId, Long userId, Sentiment sentiment, int score) {
-        ratingRepository.save(Rating.create(contentId, userId, sentiment, score, "제목", "본문", null));
+    private Long review(Long contentId, Long userId, Sentiment sentiment, int score) {
+        return ratingRepository.save(Rating.create(contentId, userId, sentiment, score, "제목", "본문", null)).getId();
+    }
+
+    private List<Long> sortedIds(RatingContentCategory category, RatingContentSort sort) {
+        return ratingService.getContents(new RatingContentQuery(category, null, null, sort, 0, 20)).content().stream()
+                .map(RatingContentSummaryResponse::id).toList();
     }
 
     private static void assertError(ThrowingCallable call, ErrorCode expected) {
@@ -182,5 +190,78 @@ class RatingServiceTest {
         SentimentStats stats = ratingService.getContent(contentId).stats();
         assertThat(stats.likeRatio()).isEqualTo(100);
         assertThat(stats.dislikeAverageScore()).isNull();
+    }
+
+    @Test
+    @DisplayName("목록 정렬: 후기 많은 순·좋아요 많은 순·싫어요 많은 순·평균 별점 순, 같으면 최신 등록순이고 별점이 없으면 맨 뒤")
+    void 콘텐츠_목록_정렬() {
+        Long a = register(RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING);
+        Long b = register(RatingContentSubcategory.MOVIE, RatingContentStatus.ENDED);
+        Long c = register(RatingContentSubcategory.DRAMA, RatingContentStatus.UPCOMING);
+        Long hidden = register(RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING);
+        Long cafe = register(RatingContentSubcategory.CAFE, RatingContentStatus.ONGOING);
+        review(a, 1L, Sentiment.LIKE, 5);
+        review(a, 2L, Sentiment.LIKE, 4);
+        review(b, 1L, Sentiment.LIKE, 2);
+        review(b, 2L, Sentiment.DISLIKE, 1);
+        review(b, 3L, Sentiment.DISLIKE, 1);
+        for (long user = 1; user <= 5; user++) {
+            review(hidden, user, Sentiment.DISLIKE, 5);
+            review(cafe, user, Sentiment.DISLIKE, 5);
+        }
+        ratingService.changeContentVisibility(hidden, false);
+
+        RatingContentCategory media = RatingContentCategory.MEDIA;
+        assertThat(sortedIds(media, RatingContentSort.REVIEWS)).containsExactly(b, a, c);
+        assertThat(sortedIds(media, RatingContentSort.LIKES)).containsExactly(a, b, c);
+        assertThat(sortedIds(media, RatingContentSort.DISLIKES)).as("a와 c는 0개라 최신 등록인 c가 먼저").containsExactly(b, c, a);
+        assertThat(sortedIds(media, RatingContentSort.SCORE)).containsExactly(a, b, c);
+        assertThat(sortedIds(null, RatingContentSort.REVIEWS)).as("전체에는 다른 대분류도 나온다").startsWith(cafe);
+        assertThat(ratingService.getContents(new RatingContentQuery(media, null, null, RatingContentSort.REVIEWS, 0, 2))
+                .totalElements()).isEqualTo(3);
+        assertError(() -> ratingService.getContents(new RatingContentQuery(media, RatingContentSubcategory.CAFE, null,
+                RatingContentSort.REVIEWS, 0, 20)), RatingErrorCode.RATING_CATEGORY_MISMATCH);
+    }
+
+    @Test
+    @DisplayName("목록 미리보기: 좋아요·싫어요 후기를 공감 많은 순으로 2개씩, 같으면 최신 후기 먼저")
+    void 콘텐츠_목록_미리보기() {
+        Long content = register(RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING);
+        Long empty = register(RatingContentSubcategory.MOVIE, RatingContentStatus.ONGOING);
+        Long first = review(content, 1L, Sentiment.LIKE, 5);
+        Long popular = review(content, 2L, Sentiment.LIKE, 4);
+        Long newest = review(content, 3L, Sentiment.LIKE, 3);
+        Long dislike = review(content, 4L, Sentiment.DISLIKE, 1);
+        ratingService.likeReview(popular, 10L);
+        ratingService.likeReview(popular, 11L);
+        ratingService.likeReview(first, 10L);
+
+        List<RatingContentSummaryResponse> contents =
+                ratingService.getContents(new RatingContentQuery(null, null, null, 0, 20)).content();
+        RatingContentSummaryResponse withReviews = contents.stream().filter(row -> row.id().equals(content)).findFirst()
+                .orElseThrow();
+        assertThat(withReviews.likePreviews()).extracting(RatingReviewResponse::id).containsExactly(popular, first);
+        assertThat(withReviews.likePreviews().get(0).likeCount()).isEqualTo(2);
+        assertThat(withReviews.dislikePreviews()).extracting(RatingReviewResponse::id).containsExactly(dislike);
+        assertThat(withReviews.likePreviews()).extracting(RatingReviewResponse::id).doesNotContain(newest);
+
+        RatingContentSummaryResponse noReviews = contents.stream().filter(row -> row.id().equals(empty)).findFirst()
+                .orElseThrow();
+        assertThat(noReviews.likePreviews()).isEmpty();
+        assertThat(noReviews.dislikePreviews()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("공감이 같으면 최신 후기가 먼저 미리보기에 나온다")
+    void 콘텐츠_목록_미리보기_동률() {
+        Long content = register(RatingContentSubcategory.DRAMA, RatingContentStatus.ONGOING);
+        Long older = review(content, 1L, Sentiment.LIKE, 5);
+        Long newer = review(content, 2L, Sentiment.LIKE, 5);
+        Long third = review(content, 3L, Sentiment.LIKE, 5);
+        Long newest = review(content, 4L, Sentiment.LIKE, 5);
+
+        assertThat(ratingService.getContents(new RatingContentQuery(null, null, null, 0, 20)).content().get(0)
+                .likePreviews()).extracting(RatingReviewResponse::id).containsExactly(newest, third)
+                .doesNotContain(older, newer);
     }
 }
