@@ -13,6 +13,12 @@ import java.util.Optional;
  */
 public interface MemberService {
 
+    /**
+     * 알림을 받을 회원인지. 알림 수신을 켰고(users.notify) 탈퇴·이용 제한 상태가 아니면 true.
+     * 없는 회원이면 예외 대신 false (알림은 만들지 않으면 그만이라서)
+     */
+    boolean isNotificationEnabled(Long memberId);
+
     /** 탈퇴 회원도 반환한다(withdrawn = true). 없으면 MEMBER_NOT_FOUND */
     MemberInfo getMember(Long memberId);
 

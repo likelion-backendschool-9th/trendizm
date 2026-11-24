@@ -3,6 +3,7 @@ package com.trendizm.backend.auth.adapter.out.security;
 import com.trendizm.backend.auth.adapter.in.security.JwtAuthenticationFilter;
 import com.trendizm.backend.auth.application.port.out.TokenProvider;
 import com.trendizm.backend.auth.config.JwtProperties;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -56,6 +57,9 @@ public class SecurityConfig {
                         .authenticationEntryPoint(securityErrorHandler)
                         .accessDeniedHandler(securityErrorHandler))
                 .authorizeHttpRequests(auth -> auth
+                        // SSE(/api/notifications/stream)는 연결이 끝날 때 요청이 내부에서 한 번 더 처리된다(ASYNC dispatch).
+                        // 이때는 JWT 필터가 다시 돌지 않아 비로그인으로 보이므로 막지 않는다. 인증은 처음 연결할 때 이미 했다
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers("/error").permitAll()
                         // permitAll보다 먼저 둔다. 순서가 바뀌면 로그인 없이 열린다
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
