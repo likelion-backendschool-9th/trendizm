@@ -16,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -60,12 +59,9 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
-    /**
-     * 투표·해석 작성이 커밋된 뒤(AFTER_COMMIT)에 불린다. 그때는 원래 트랜잭션이 이미 끝나서
-     * 같은 트랜잭션에 참여하면 저장이 커밋되지 않으므로 REQUIRES_NEW로 새 트랜잭션을 연다.
-     */
+    /** 투표·해석 작성이 커밋된 뒤 알림 전용 스레드(LookupNotificationListener)에서 불린다 */
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void notify(CreateNotificationCommand command) {
         Long receiverId = command.receiverId();
         if (receiverId.equals(command.actorId()) || !memberService.isNotificationEnabled(receiverId)) {
@@ -86,6 +82,7 @@ public class NotificationServiceImpl implements NotificationService {
     /**
      * 저장이 커밋되기 전에 보내면 화면이 목록을 다시 불렀을 때 새 알림이 아직 없을 수 있다. 그래서 커밋 뒤에 보낸다.
      * 실시간 전송은 덤이라, 실패해도 로그만 남기고 저장·읽음 처리 결과에는 영향을 주지 않는다.
+     * 안 읽은 수는 그 회원이 연결돼 있을 때만 센다(접속하지 않은 회원 때문에 매번 세지 않는다).
      */
     private void pushUnreadCountAfterCommit(Long receiverId) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -93,7 +90,7 @@ public class NotificationServiceImpl implements NotificationService {
             public void afterCommit() {
                 try {
                     notificationPusher.pushUnreadCount(receiverId,
-                            notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId));
+                            () -> notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId));
                 } catch (RuntimeException e) {
                     log.warn("안 읽은 알림 수 전송 실패 receiverId={}", receiverId, e);
                 }

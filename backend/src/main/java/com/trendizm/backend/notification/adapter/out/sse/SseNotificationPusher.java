@@ -9,7 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.LongSupplier;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.ContextClosedEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -30,6 +33,13 @@ public class SseNotificationPusher implements NotificationPusher {
     static final int MAX_CONNECTIONS_PER_MEMBER = 5;
 
     static final String UNREAD_COUNT_EVENT = "unread-count";
+
+    /**
+     * 연결 수 제한(MAX_CONNECTIONS_PER_MEMBER)으로 밀려난 연결에 닫기 전에 보낸다.
+     * 화면은 이 이벤트를 받으면 다시 연결하지 않는다. 그냥 닫으면 브라우저가 일시적인 끊김으로 보고 다시 연결해서,
+     * 그 연결이 다른 탭을 밀어내고 그 탭이 또 다시 연결하는 일이 반복된다.
+     */
+    static final String EVICTED_EVENT = "evicted";
 
     private final Map<Long, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
@@ -53,16 +63,31 @@ public class SseNotificationPusher implements NotificationPusher {
             }
             return connections;
         });
-        evicted.forEach(SseEmitter::complete);
+        evicted.forEach(SseNotificationPusher::evict);
         send(memberId, emitter, unreadCount);
         return emitter;
     }
 
     @Override
-    public void pushUnreadCount(Long receiverId, long unreadCount) {
-        for (SseEmitter emitter : emitters.getOrDefault(receiverId, List.of())) {
-            send(receiverId, emitter, unreadCount);
+    public void pushUnreadCount(Long receiverId, LongSupplier unreadCount) {
+        List<SseEmitter> connections = emitters.getOrDefault(receiverId, List.of());
+        if (connections.isEmpty()) {
+            return;
         }
+        long count = unreadCount.getAsLong();
+        for (SseEmitter emitter : connections) {
+            send(receiverId, emitter, count);
+        }
+    }
+
+    /**
+     * 서버가 꺼지기 시작하면 모든 연결을 먼저 닫는다. 열린 SSE가 있으면 Spring이 요청이 끝나기를 30초까지 기다리는데,
+     * Docker는 10초 뒤 강제로 꺼서 배포 중 중단 시간이 길어진다. 화면은 끊김으로 보고 새 서버가 뜨면 다시 연결한다.
+     * ContextClosedEvent는 웹 서버가 요청을 기다리기(graceful shutdown) 전에 발행된다.
+     */
+    @EventListener(ContextClosedEvent.class)
+    public void closeAll() {
+        emitters.values().forEach(list -> list.forEach(SseEmitter::complete));
     }
 
     /**
@@ -93,6 +118,15 @@ public class SseNotificationPusher implements NotificationPusher {
             log.debug("SSE 전송 실패, 연결 정리 memberId={}", memberId);
             remove(memberId, emitter);
         }
+    }
+
+    private static void evict(SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().name(EVICTED_EVENT).data(""));
+        } catch (IOException | IllegalStateException e) {
+            // 이미 끊긴 연결이면 알릴 필요가 없다
+        }
+        emitter.complete();
     }
 
     private void remove(Long memberId, SseEmitter emitter) {

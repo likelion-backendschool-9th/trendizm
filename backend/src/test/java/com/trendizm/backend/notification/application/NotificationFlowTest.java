@@ -3,7 +3,6 @@ package com.trendizm.backend.notification.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -20,12 +19,20 @@ import com.trendizm.backend.lookup.application.port.MemeInterpretationService;
 import com.trendizm.backend.lookup.domain.enums.MemeVoteType;
 import com.trendizm.backend.member.application.dto.RegisterMemberCommand;
 import com.trendizm.backend.member.application.port.MemberService;
+import com.trendizm.backend.notification.adapter.in.event.LookupNotificationListener;
 import com.trendizm.backend.notification.adapter.out.sse.SseNotificationPusher;
 import com.trendizm.backend.notification.application.dto.CreateNotificationCommand;
 import com.trendizm.backend.notification.application.dto.NotificationResponse;
 import com.trendizm.backend.notification.application.exception.NotificationErrorCode;
 import com.trendizm.backend.notification.application.port.NotificationService;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +44,8 @@ import org.springframework.test.context.jdbc.Sql;
 
 /**
  * 투표·해석 작성이 커밋된 뒤 알림이 만들어지는지 검사한다.
- * 알림은 커밋 뒤(AFTER_COMMIT)에 만들어지므로 @Transactional을 붙이지 않고, 테스트가 끝나면 테이블을 비운다.
+ * 알림은 커밋 뒤(AFTER_COMMIT) 알림 전용 스레드에서 만들어지므로 @Transactional을 붙이지 않고, 테스트가 끝나면 테이블을 비운다.
+ * 투표·해석 작성 뒤에는 알림 스레드가 일을 끝낼 때까지 기다린다(awaitNotifications).
  */
 @SpringBootTest
 @Sql(statements = {"DELETE FROM notifications", "DELETE FROM meme_interpretation_votes",
@@ -60,6 +68,9 @@ class NotificationFlowTest {
     @MockitoSpyBean
     private SseNotificationPusher sseEmitters;
 
+    @Autowired
+    private LookupNotificationListener notificationListener;
+
     private Long writer;
     private Long voter;
     private Long otherVoter;
@@ -76,6 +87,7 @@ class NotificationFlowTest {
                 "TMI", writer, "Too Much Information", "내용", "https://youtu.be/tmi01", null, null));
         memeId = first.memeId();
         interpretationId = first.id();
+        awaitNotifications();
     }
 
     private Long register(String name) {
@@ -83,7 +95,27 @@ class NotificationFlowTest {
     }
 
     private MemeVoteResult vote(Long userId, MemeVoteType type) {
-        return interpretationService.vote(new VoteMemeInterpretationCommand(interpretationId, userId, type));
+        MemeVoteResult result = interpretationService.vote(new VoteMemeInterpretationCommand(interpretationId, userId, type));
+        awaitNotifications();
+        return result;
+    }
+
+    private MemeInterpretationResponse addInterpretation(Long userId, String meaning) {
+        MemeInterpretationResponse added = interpretationService.addInterpretation(
+                new AddMemeInterpretationCommand(memeId, userId, meaning, "내용"));
+        awaitNotifications();
+        return added;
+    }
+
+    /** 알림은 커밋 뒤 알림 전용 스레드에서 저장된다. 그 스레드가 일을 다 끝낼 때까지 기다린다(최대 5초) */
+    private void awaitNotifications() {
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (!notificationListener.isIdle()) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("알림 저장이 5초 안에 끝나지 않음");
+            }
+            Thread.onSpinWait();
+        }
     }
 
     private List<NotificationResponse> notificationsOf(Long receiverId) {
@@ -111,7 +143,7 @@ class NotificationFlowTest {
         assertThat(notification.message()).isEqualTo("‘tmi’에 쓴 해석에 동의 1개가 달렸어요.");
         assertThat(notification.read()).isFalse();
         assertThat(notificationService.getUnreadCount(writer)).isEqualTo(1);
-        verify(sseEmitters).pushUnreadCount(writer, 1);
+        verify(sseEmitters).pushUnreadCount(eq(writer), any());
     }
 
     @Test
@@ -175,20 +207,52 @@ class NotificationFlowTest {
         vote(voter, MemeVoteType.AGREE);
 
         assertThat(notificationsOf(writer)).isEmpty();
-        verify(sseEmitters, never()).pushUnreadCount(eq(writer), anyLong());
+        verify(sseEmitters, never()).pushUnreadCount(eq(writer), any());
     }
 
     @Test
     @DisplayName("다른 사람이 내 문서에 해석을 쓰면 문서 주인에게 알림이 생긴다")
     void 새_해석_알림() {
-        MemeInterpretationResponse added = interpretationService.addInterpretation(
-                new AddMemeInterpretationCommand(memeId, voter, "다른 뜻", "내용"));
+        MemeInterpretationResponse added = addInterpretation(voter, "다른 뜻");
 
         List<NotificationResponse> notifications = notificationsOf(writer);
         assertThat(notifications).hasSize(1);
         assertThat(notifications.getFirst().type()).isEqualTo("meme-interpretation");
         assertThat(notifications.getFirst().interpretationId()).isEqualTo(added.id());
         assertThat(notifications.getFirst().message()).isEqualTo("‘tmi’에 새 해석이 달렸어요.");
+    }
+
+    @Test
+    @DisplayName("DB 연결 풀(10개)보다 많은 투표가 동시에 와도 멈추지 않고 모두 성공한다")
+    void 동시_투표() throws Exception {
+        int voters = 15;
+        List<Long> memberIds = new ArrayList<>();
+        for (int i = 0; i < voters; i++) {
+            memberIds.add(register("many" + i));
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(voters);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<MemeVoteResult>> results = new ArrayList<>();
+        for (Long memberId : memberIds) {
+            results.add(pool.submit(() -> {
+                start.await();
+                return interpretationService.vote(
+                        new VoteMemeInterpretationCommand(interpretationId, memberId, MemeVoteType.AGREE));
+            }));
+        }
+        long startedAt = System.nanoTime();
+        start.countDown();
+        for (Future<MemeVoteResult> result : results) {
+            // 요청 스레드에서 알림을 저장하던 때는 연결 풀이 바닥나 30초 타임아웃까지 멈췄다
+            result.get(10, TimeUnit.SECONDS);
+        }
+        pool.shutdown();
+        awaitNotifications();
+
+        assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(10));
+        List<NotificationResponse> notifications = notificationsOf(writer);
+        assertThat(notifications).hasSize(1);
+        assertThat(notifications.getFirst().count()).isEqualTo(voters);
     }
 
     @Test
@@ -205,8 +269,8 @@ class NotificationFlowTest {
     @Test
     @DisplayName("읽음 처리해도 목록 순서가 바뀌지 않는다")
     void 읽음_처리_순서() {
-        interpretationService.addInterpretation(new AddMemeInterpretationCommand(memeId, voter, "뜻1", "내용"));
-        interpretationService.addInterpretation(new AddMemeInterpretationCommand(memeId, otherVoter, "뜻2", "내용"));
+        addInterpretation(voter, "뜻1");
+        addInterpretation(otherVoter, "뜻2");
         List<Long> before = notificationsOf(writer).stream().map(NotificationResponse::id).toList();
 
         notificationService.markAsRead(writer, before.getLast());

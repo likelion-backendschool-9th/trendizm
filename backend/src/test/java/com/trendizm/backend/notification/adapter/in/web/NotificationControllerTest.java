@@ -123,11 +123,46 @@ class NotificationControllerTest {
                 .contains("data:{\"count\":2}");
 
         // 새 알림이 생기면 같은 연결로 바뀐 수가 간다
-        pusher.pushUnreadCount(7L, 3L);
+        pusher.pushUnreadCount(7L, () -> 3L);
         assertThat(result.getResponse().getContentAsString()).contains("data:{\"count\":3}");
 
         // 연결이 끝날 때의 내부 재처리(ASYNC dispatch)는 JWT 없이 오지만 401·403이 나지 않아야 한다
         emitter.complete();
         mockMvc.perform(asyncDispatch(result)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("연결 수 제한으로 밀려난 연결에는 닫기 전에 evicted를 보내 화면이 다시 연결하지 않게 한다")
+    void SSE_밀려난_연결() throws Exception {
+        SseNotificationPusher pusher = new SseNotificationPusher();
+        given(notificationService.subscribe(7L)).willReturn(pusher.subscribe(7L, 0L));
+        MvcResult oldest = mockMvc.perform(get("/api/notifications/stream")
+                        .accept(MediaType.TEXT_EVENT_STREAM).with(user(LOGIN_USER)))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        for (int i = 0; i < 5; i++) {
+            pusher.subscribe(7L, 0L);
+        }
+
+        assertThat(oldest.getResponse().getContentAsString()).contains("event:evicted");
+        mockMvc.perform(asyncDispatch(oldest)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("서버가 꺼지기 시작하면 열린 SSE 연결을 모두 닫는다")
+    void SSE_서버_종료() throws Exception {
+        SseNotificationPusher pusher = new SseNotificationPusher();
+        given(notificationService.subscribe(7L)).willReturn(pusher.subscribe(7L, 0L));
+        MvcResult result = mockMvc.perform(get("/api/notifications/stream")
+                        .accept(MediaType.TEXT_EVENT_STREAM).with(user(LOGIN_USER)))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        pusher.closeAll();
+
+        // 연결이 끝나서 요청이 바로 마무리된다(끝나지 않았으면 asyncDispatch가 결과를 기다리며 멈춘다)
+        mockMvc.perform(asyncDispatch(result)).andExpect(status().isOk());
+        assertThat(result.getResponse().getContentAsString()).doesNotContain("event:evicted");
     }
 }

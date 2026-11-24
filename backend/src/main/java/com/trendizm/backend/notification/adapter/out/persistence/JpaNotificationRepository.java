@@ -18,11 +18,16 @@ public interface JpaNotificationRepository extends JpaRepository<Notification, L
         return refreshUnreadByTypeName(receiverId, type.name(), interpretationId, subject, eventCount, now);
     }
 
-    /** type 칼럼이 문자열이라(Notification.type 주석) 이름으로 비교한다. 쿼리로 바로 고쳐서 JPA Auditing이 updated_at을 채우지 않으므로 직접 넣는다 */
+    /**
+     * type 칼럼이 문자열이라(Notification.type 주석) 이름으로 비교한다. 쿼리로 바로 고쳐서 JPA Auditing이 updated_at을 채우지 않으므로 직접 넣는다.
+     * 수는 줄이지 않는다. 동시에 들어온 동의는 커밋된 순서와 알림이 처리되는 순서가 다를 수 있어서, 늦게 처리된 옛 수(14)가
+     * 새 수(15)를 덮어쓰지 않게 한다. 동의 취소·비동의는 알림을 만들지 않으므로 수가 줄어드는 경우는 없다.
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update Notification n
-            set n.eventCount = :eventCount, n.subject = :subject, n.lastEventAt = :now, n.updatedAt = :now
+            set n.eventCount = case when :eventCount > n.eventCount then :eventCount else n.eventCount end,
+                n.subject = :subject, n.lastEventAt = :now, n.updatedAt = :now
             where n.receiverId = :receiverId and n.type = :type and n.interpretationId = :interpretationId
               and n.readAt is null
             """)

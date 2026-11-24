@@ -1,5 +1,6 @@
 package com.trendizm.backend.notification.application.port.out;
 
+import java.util.function.LongSupplier;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -11,6 +12,9 @@ public interface NotificationPusher {
     /** 새 연결을 열고 첫 이벤트로 unreadCount를 보낸다 */
     SseEmitter subscribe(Long receiverId, long unreadCount);
 
-    /** 그 회원의 열린 연결 모두에 안 읽은 수를 보낸다. 연결이 없으면 아무것도 하지 않는다 */
-    void pushUnreadCount(Long receiverId, long unreadCount);
+    /**
+     * 그 회원의 열린 연결 모두에 안 읽은 수를 보낸다.
+     * 연결이 없으면 unreadCount를 부르지 않는다(접속하지 않은 회원의 수를 세느라 DB를 쓰지 않게)
+     */
+    void pushUnreadCount(Long receiverId, LongSupplier unreadCount);
 }

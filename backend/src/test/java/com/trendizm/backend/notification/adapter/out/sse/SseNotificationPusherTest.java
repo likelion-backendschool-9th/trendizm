@@ -25,10 +25,13 @@ class SseNotificationPusherTest {
     }
 
     @Test
-    @DisplayName("연결이 없는 회원에게 보내도 아무 일도 없다")
+    @DisplayName("연결이 없는 회원에게는 안 읽은 수를 세지도 보내지도 않는다")
     void 연결_없음() {
-        sseEmitters.pushUnreadCount(99L, 1);
+        sseEmitters.pushUnreadCount(99L, () -> {
+            throw new AssertionError("연결이 없으면 수를 세면 안 된다");
+        });
         sseEmitters.sendHeartbeat();
+        sseEmitters.closeAll();
 
         assertThat(sseEmitters.connectionCount(99L)).isZero();
     }

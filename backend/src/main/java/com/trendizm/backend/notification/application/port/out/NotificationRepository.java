@@ -20,7 +20,7 @@ public interface NotificationRepository {
     long countByReceiverIdAndReadAtIsNull(Long receiverId);
 
     /**
-     * 같은 해석의 안 읽은 알림이 있으면 그 알림의 수·단어·마지막 시각을 바꾼다. 바꾼 행 수를 돌려준다.
+     * 같은 해석의 안 읽은 알림이 있으면 그 알림의 수(더 클 때만)·단어·마지막 시각을 바꾼다. 바꾼 행 수를 돌려준다.
      * 확인과 수정을 쿼리 하나로 해서, 동시에 들어온 투표가 서로의 수정을 덮어쓰지 않게 한다.
      */
     int refreshUnread(Long receiverId, NotificationType type, Long interpretationId,

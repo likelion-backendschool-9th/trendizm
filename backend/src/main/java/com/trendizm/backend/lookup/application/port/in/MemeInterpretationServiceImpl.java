@@ -131,7 +131,10 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     @Override
     @Transactional
     public MemeVoteResult vote(VoteMemeInterpretationCommand command) {
-        MemeInterpretation interpretation = getVisibleInterpretation(command.interpretationId());
+        MemeInterpretation interpretation = interpretationRepository.findById(command.interpretationId())
+                .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
+        // 공개 여부를 확인하며 읽은 문서를 알림 이벤트의 단어에도 쓴다(다시 조회하지 않는다)
+        Meme meme = getVisibleMeme(interpretation);
         Long interpretationId = interpretation.getId();
         MemeVoteType type = command.type();
         boolean agree = type == MemeVoteType.AGREE;
@@ -145,9 +148,8 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
         }
         MemeVoteResult result = currentState(interpretationId, command.userId());
         if (changed && agree) {
-            String word = memeRepository.findById(interpretation.getMemeId()).map(Meme::getWord).orElse("");
-            eventPublisher.publishEvent(new MemeInterpretationVotedEvent(interpretation.getMemeId(), interpretationId,
-                    interpretation.getUserId(), command.userId(), word, result.agreeCount()));
+            eventPublisher.publishEvent(new MemeInterpretationVotedEvent(meme.getId(), interpretationId,
+                    interpretation.getUserId(), command.userId(), meme.getWord(), result.agreeCount()));
         }
         return result;
     }
@@ -170,11 +172,15 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     private MemeInterpretation getVisibleInterpretation(Long interpretationId) {
         MemeInterpretation interpretation = interpretationRepository.findById(interpretationId)
                 .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
-        boolean visible = memeRepository.findById(interpretation.getMemeId()).filter(meme -> !meme.isHidden()).isPresent();
-        if (!visible) {
-            throw new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND);
-        }
+        getVisibleMeme(interpretation);
         return interpretation;
+    }
+
+    /** 해석이 달린 문서. 문서가 없거나 숨겨졌으면 해석도 없는 것으로 본다(MEME_INTERPRETATION_NOT_FOUND) */
+    private Meme getVisibleMeme(MemeInterpretation interpretation) {
+        return memeRepository.findById(interpretation.getMemeId())
+                .filter(meme -> !meme.isHidden())
+                .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
     }
 
     /**
