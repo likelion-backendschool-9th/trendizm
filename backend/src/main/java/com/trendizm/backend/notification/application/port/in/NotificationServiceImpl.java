@@ -1,62 +1,105 @@
 package com.trendizm.backend.notification.application.port.in;
 
+import com.trendizm.backend.global.error.BusinessException;
+import com.trendizm.backend.global.response.PageResponse;
+import com.trendizm.backend.member.application.port.MemberService;
+import com.trendizm.backend.notification.application.dto.CreateNotificationCommand;
 import com.trendizm.backend.notification.application.dto.NotificationResponse;
+import com.trendizm.backend.notification.application.exception.NotificationErrorCode;
 import com.trendizm.backend.notification.application.port.NotificationService;
+import com.trendizm.backend.notification.application.port.out.NotificationPusher;
 import com.trendizm.backend.notification.application.port.out.NotificationRepository;
+import com.trendizm.backend.notification.domain.entity.Notification;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationPusher notificationPusher;
+    private final MemberService memberService;
 
     @Override
-    public Page<NotificationResponse> getNotifications(Pageable pageable) {
-        // TODO(notification): 알림 목록 조회
-        //  1. notificationRepository.findAll(pageable)
-        //  2. .map(NotificationResponse::from) 으로 변환해 반환
-        //  (숏폼·롱폼 탭, 해시태그 조회는 컬럼이 정해지면 NotificationRepository에 findByXxx를 추가)
-        throw new UnsupportedOperationException("TODO(notification): 알림 목록 조회");
+    public PageResponse<NotificationResponse> getNotifications(Long receiverId, int page, int size) {
+        return PageResponse.from(
+                notificationRepository.findByReceiverIdOrderByLastEventAtDescIdDesc(receiverId, PageRequest.of(page, size)),
+                NotificationResponse::from);
     }
 
     @Override
-    public NotificationResponse getNotification(Long notificationId) {
-        // TODO(notification): 알림 단건 조회
-        //  1. notificationRepository.findById(notificationId), 없으면 예외를 던진다
-        //  2. NotificationResponse.from(notification) 반환
-        throw new UnsupportedOperationException("TODO(notification): 알림 단건 조회");
+    public long getUnreadCount(Long receiverId) {
+        return notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId);
     }
 
+    @Override
+    public SseEmitter subscribe(Long receiverId) {
+        return notificationPusher.subscribe(receiverId, getUnreadCount(receiverId));
+    }
+
+    /** 다른 탭에 열린 헤더의 숫자도 줄어들게, 읽음으로 바뀌었으면 커밋 뒤에 안 읽은 수를 보낸다 */
     @Override
     @Transactional
-    public Long createNotification() {
-        // TODO(notification): 알림 등록
-        //  1. Notification.create(...) (영상 링크 → 임베드 URL 변환은 여기서)
-        //  2. notificationRepository.save(notification).getId() 반환
-        throw new UnsupportedOperationException("TODO(notification): 알림 등록");
+    public void markAsRead(Long receiverId, Long notificationId) {
+        Notification notification = notificationRepository.findByIdAndReceiverId(notificationId, receiverId)
+                .orElseThrow(() -> new BusinessException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
+        if (notification.markAsRead(now())) {
+            pushUnreadCountAfterCommit(receiverId);
+        }
     }
 
+    /** 투표·해석 작성이 커밋된 뒤 알림 전용 스레드(LookupNotificationListener)에서 불린다 */
     @Override
     @Transactional
-    public void updateNotification(Long notificationId) {
-        // TODO(notification): 알림 수정
-        //  1. notificationRepository.findById(notificationId), 없으면 NOT_FOUND
-        //  2. Notification에 update(...) 메서드를 만들어 호출 (트랜잭션 안이라 변경 감지로 저장된다)
-        throw new UnsupportedOperationException("TODO(notification): 알림 수정");
+    public void notify(CreateNotificationCommand command) {
+        Long receiverId = command.receiverId();
+        if (receiverId.equals(command.actorId()) || !memberService.isNotificationEnabled(receiverId)) {
+            return;
+        }
+        LocalDateTime now = now();
+        String subject = Notification.truncateSubject(command.subject());
+        boolean refreshed = command.type().isGrouped()
+                && notificationRepository.refreshUnread(receiverId, command.type(), command.interpretationId(),
+                subject, command.eventCount(), now) > 0;
+        if (!refreshed) {
+            notificationRepository.save(Notification.create(receiverId, command.type(), command.memeId(),
+                    command.interpretationId(), subject, command.eventCount(), now));
+        }
+        pushUnreadCountAfterCommit(receiverId);
     }
 
-    @Override
-    @Transactional
-    public void deleteNotification(Long notificationId) {
-        // TODO(notification): 알림 삭제
-        //  1. notificationRepository.findById(notificationId), 없으면 NOT_FOUND
-        //  2. notificationRepository.delete(notification)
-        throw new UnsupportedOperationException("TODO(notification): 알림 삭제");
+    /**
+     * 저장이 커밋되기 전에 보내면 화면이 목록을 다시 불렀을 때 새 알림이 아직 없을 수 있다. 그래서 커밋 뒤에 보낸다.
+     * 실시간 전송은 덤이라, 실패해도 로그만 남기고 저장·읽음 처리 결과에는 영향을 주지 않는다.
+     * 안 읽은 수는 그 회원이 연결돼 있을 때만 센다(접속하지 않은 회원 때문에 매번 세지 않는다).
+     */
+    private void pushUnreadCountAfterCommit(Long receiverId) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    notificationPusher.pushUnreadCount(receiverId,
+                            () -> notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId));
+                } catch (RuntimeException e) {
+                    log.warn("안 읽은 알림 수 전송 실패 receiverId={}", receiverId, e);
+                }
+            }
+        });
+    }
+
+    /** JPA Auditing(JpaAuditingConfig)과 같게 마이크로초까지만 쓴다. PostgreSQL timestamp 정밀도와 맞춘다 */
+    private static LocalDateTime now() {
+        return LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
     }
 }

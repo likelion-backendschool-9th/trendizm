@@ -17,6 +17,7 @@ import com.trendizm.backend.member.application.port.MemberService;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /** 동시 요청은 통합 테스트로 재현하기 어려워서, 저장소를 mock으로 바꿔 UNIQUE 위반 상황만 확인한다 */
@@ -26,8 +27,9 @@ class MemeInterpretationServiceImplTest {
     private final MemeInterpretationRepository interpretationRepository = mock(MemeInterpretationRepository.class);
     private final MemeInterpretationVoteRepository voteRepository = mock(MemeInterpretationVoteRepository.class);
     private final MemberService memberService = mock(MemberService.class);
-    private final MemeInterpretationServiceImpl service =
-            new MemeInterpretationServiceImpl(memeRepository, interpretationRepository, voteRepository, memberService);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final MemeInterpretationServiceImpl service = new MemeInterpretationServiceImpl(
+            memeRepository, interpretationRepository, voteRepository, memberService, eventPublisher);
 
     @Test
     @DisplayName("조회와 저장 사이에 다른 요청이 같은 단어·출처로 문서를 만들면 409 MEME_ALREADY_EXISTS")

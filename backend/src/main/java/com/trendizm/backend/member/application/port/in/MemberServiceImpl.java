@@ -33,6 +33,13 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
+    public boolean isNotificationEnabled(Long memberId) {
+        return memberRepository.findById(memberId)
+                .map(member -> member.isNotify() && !member.isWithdrawn() && !member.isSuspended())
+                .orElse(false);
+    }
+
+    @Override
     public Map<Long, MemberInfo> getMembers(Collection<Long> memberIds) {
         if (memberIds.isEmpty()) {
             return Map.of();
