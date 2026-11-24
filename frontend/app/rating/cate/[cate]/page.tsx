@@ -1,65 +1,8 @@
 import { Suspense } from "react";
 import RatingList, {
-  type RatingCategory,
   type RatingContent,
 } from "@/app/rating/_components/RatingList";
-
-const CATEGORIES: RatingCategory[] = [
-  {
-    slug: "media",
-    name: "미디어",
-    icon: "/images/rating/media.svg",
-    subcategories: [
-      { slug: "airing", name: "방영중" },
-      { slug: "ended", name: "완결" },
-    ],
-  },
-  {
-    slug: "food",
-    name: "푸드",
-    icon: "/images/rating/food.svg",
-    subcategories: [
-      { slug: "new", name: "신상" },
-      { slug: "discontinued", name: "판매종료" },
-    ],
-  },
-  {
-    slug: "music",
-    name: "음악",
-    icon: "/images/rating/music.svg",
-    subcategories: [
-      { slug: "new-release", name: "신곡" },
-      { slug: "upcoming-concert", name: "공연 예정" },
-    ],
-  },
-  {
-    slug: "books",
-    name: "도서·웹툰",
-    icon: "/images/rating/books.svg",
-    subcategories: [
-      { slug: "ongoing", name: "연재중" },
-      { slug: "completed", name: "완결" },
-    ],
-  },
-  {
-    slug: "game",
-    name: "게임",
-    icon: "/images/rating/game.svg",
-    subcategories: [
-      { slug: "upcoming", name: "출시 예정" },
-      { slug: "live", name: "서비스중" },
-    ],
-  },
-  {
-    slug: "place",
-    name: "장소",
-    icon: "/images/rating/place.svg",
-    subcategories: [
-      { slug: "ongoing", name: "진행중" },
-      { slug: "ended", name: "종료" },
-    ],
-  },
-];
+import { RATING_CATEGORIES } from "@/app/rating/_lib/categories";
 
 const TOTAL_COUNT = 3;
 
@@ -320,7 +263,7 @@ async function RatingCategoryList({
 
   return (
     <RatingList
-      categories={CATEGORIES}
+      categories={RATING_CATEGORIES}
       cate={cate}
       totalCount={TOTAL_COUNT}
       contents={CONTENTS}
