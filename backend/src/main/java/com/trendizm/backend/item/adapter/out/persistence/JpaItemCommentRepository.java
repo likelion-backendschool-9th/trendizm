@@ -5,6 +5,8 @@ import com.trendizm.backend.item.application.port.out.ItemCommentRepository;
 import com.trendizm.backend.item.domain.entity.ItemComment;
 import java.util.Collection;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,4 +22,14 @@ public interface JpaItemCommentRepository extends JpaRepository<ItemComment, Lon
             group by c.questionId
             """)
     List<CountByKey> countGroupByQuestionId(@Param("questionIds") Collection<Long> questionIds);
+
+    @Override
+    @Query(value = """
+            select c from ItemComment c
+            where c.questionId = :questionId and c.parentId is null
+            order by (select count(l) from ItemCommentLike l where l.commentId = c.id) desc, c.id desc
+            """,
+            countQuery = "select count(c) from ItemComment c where c.questionId = :questionId and c.parentId is null")
+    Page<ItemComment> findByQuestionIdAndParentIdIsNullOrderByLikes(@Param("questionId") Long questionId,
+                                                                     Pageable pageable);
 }

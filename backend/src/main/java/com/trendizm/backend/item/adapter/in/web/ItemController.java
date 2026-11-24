@@ -5,12 +5,14 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.item.adapter.in.web.dto.CreateItemCommentRequest;
 import com.trendizm.backend.item.adapter.in.web.dto.CreateItemQuestionRequest;
 import com.trendizm.backend.item.adapter.in.web.dto.CreateItemRequest;
+import com.trendizm.backend.item.application.dto.ItemAdjacentQuestions;
 import com.trendizm.backend.item.application.dto.ItemCommentResponse;
 import com.trendizm.backend.item.application.dto.ItemQuestionQuery;
 import com.trendizm.backend.item.application.dto.ItemQuestionResponse;
 import com.trendizm.backend.item.application.dto.ItemQuestionSummaryResponse;
 import com.trendizm.backend.item.application.dto.ItemResponse;
 import com.trendizm.backend.item.application.exception.ItemErrorCode;
+import com.trendizm.backend.item.application.port.ItemCommentSort;
 import com.trendizm.backend.item.application.port.ItemService;
 import com.trendizm.backend.item.domain.enums.ItemCategory;
 import com.trendizm.backend.item.domain.enums.ItemSubcategory;
@@ -68,6 +70,13 @@ public class ItemController {
         return itemService.getQuestions(new ItemQuestionQuery(parsedCategory, parsedSubcategory, page, size));
     }
 
+    /** 이전/다음 글 (공개 글 기준). 예: { "previous": { "id": 2, "title": "..." }, "next": null } */
+    @GetMapping("/{itemId}/adjacent")
+    public ItemAdjacentQuestions getAdjacentQuestions(@PathVariable Long itemId) {
+        return itemService.getAdjacentQuestions(itemId);
+    }
+
+    /** 질문 글 상세. 볼 때마다 조회수(viewCount)가 1 오른다 */
     @GetMapping("/{itemId}")
     public ItemQuestionResponse getQuestion(
             @PathVariable Long itemId,
@@ -83,16 +92,22 @@ public class ItemController {
         return itemService.createQuestion(request.toCommand(userId));
     }
 
-    /** 댓글 목록 (최신순). 댓글마다 대댓글(replies)이 오래된 순으로 들어 있고, page·size는 댓글 기준이다 */
+    /**
+     * 댓글 목록. sort는 latest(기본, 최신순)·likes(공감 많은 순). 없는 값이면 ITEM_INVALID_SORT
+     * 댓글마다 대댓글(replies)이 오래된 순으로 들어 있고, page·size는 댓글 기준이다
+     */
     @GetMapping("/{itemId}/comments")
     public PageResponse<ItemCommentResponse> getComments(
             @PathVariable Long itemId,
             @AuthenticationPrincipal(expression = OPTIONAL_USER_ID) Long viewerId,
+            @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
             @RequestParam(defaultValue = "10")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
             @Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
-        return itemService.getComments(itemId, viewerId, page, size);
+        ItemCommentSort parsedSort = ItemCommentSort.fromSlug(sort.strip())
+                .orElseThrow(() -> new BusinessException(ItemErrorCode.ITEM_INVALID_SORT));
+        return itemService.getComments(itemId, viewerId, parsedSort, page, size);
     }
 
     @PostMapping("/{itemId}/comments")
