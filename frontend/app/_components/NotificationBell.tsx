@@ -10,6 +10,8 @@ import { ApiError } from "@/lib/api/types";
 // - 안 읽은 수는 SSE(GET /api/notifications/stream)로 실시간으로 받는다. 서버는 수만 보내므로 목록은 펼칠 때 API로 부른다.
 // - SSE가 끊기면 apiFetch로 수를 한 번 다시 불러 토큰을 재발급받고(EventSource는 재발급을 못 한다) 다시 연결한다.
 //   그 요청이 401이면 로그아웃된 것이라 연결을 멈춘다. 401만 계속 반복해서 재연결하지 않게 하려는 것이다.
+// - 탭이 많아 서버가 이 연결을 밀어내면("evicted") 다시 연결하지 않는다. 다시 연결하면 다른 탭을 밀어내고,
+//   그 탭이 또 다시 연결하는 일이 반복된다. 이 탭을 다시 보면(visibilitychange) 그때 연결한다.
 
 /** GET /api/notifications의 한 줄 (backend NotificationResponse) */
 type NotificationItem = {
@@ -85,6 +87,10 @@ function useUnreadCount(): number | null {
         retryDelay = RETRY_MIN_MS;
         setCount((JSON.parse((event as MessageEvent<string>).data) as UnreadCount).count);
       });
+      source.addEventListener("evicted", () => {
+        source?.close();
+        source = null;
+      });
       // 끊기면 브라우저의 자동 재연결 대신 직접 다시 연결한다(그 사이에 토큰 재발급을 넣기 위해)
       source.onerror = () => {
         source?.close();
@@ -119,7 +125,7 @@ function useUnreadCount(): number | null {
       }
     }
 
-    // 다른 탭에 있다가 돌아왔을 때 끊겨 있으면 바로 다시 연결한다
+    // 다른 탭에 있다가 돌아왔을 때 끊겨 있으면(밀려난 경우 포함) 바로 다시 연결한다
     function onVisible() {
       if (document.visibilityState === "visible" && !stopped && source === null) {
         clearTimeout(retryTimer);
