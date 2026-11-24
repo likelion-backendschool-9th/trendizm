@@ -55,6 +55,19 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("BusinessException에 항목별 오류를 넘기면 errors에 담아 응답하고, 없으면 errors를 빼고 응답한다")
+    void 비즈니스_예외_항목별_오류() throws Exception {
+        mockMvc.perform(get("/test/business-errors"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TEST_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("테스트 대상을 찾을 수 없습니다."))
+                .andExpect(jsonPath("$.errors[0].field").value("3번째 줄"))
+                .andExpect(jsonPath("$.errors[0].message").value("값이 없습니다."));
+        mockMvc.perform(get("/test/business"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
+    }
+
+    @Test
     @DisplayName("@Valid 검증에 실패하면 400 INVALID_INPUT과 필드별 오류 목록을 준다")
     void 검증_실패() throws Exception {
         mockMvc.perform(post("/test/valid")
@@ -184,6 +197,12 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/business-message")
         void businessWithMessage() {
             throw new BusinessException(TestErrorCode.TEST_NOT_FOUND, "3번 대상이 없습니다.");
+        }
+
+        @GetMapping("/test/business-errors")
+        void businessWithErrors() {
+            throw new BusinessException(TestErrorCode.TEST_NOT_FOUND,
+                    java.util.List.of(new ErrorResponse.FieldError("3번째 줄", "값이 없습니다.")));
         }
 
         @PostMapping("/test/valid")
