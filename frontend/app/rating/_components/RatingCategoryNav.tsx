@@ -1,30 +1,42 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { RatingCategory } from "@/app/rating/_components/RatingList";
+import { RATING_CATEGORIES } from "@/app/rating/_lib/categories";
 
 type RatingCategoryNavProps = {
-  categories: RatingCategory[];
-  // 없으면 첫 번째 대분류의 '전체'가 선택된 것으로 보여 준다.
+  // 없으면 '전체'(/rating)가 선택된 것으로 보여 준다.
   cate?: string;
   subcate?: string;
 };
 
 // 와이어프레임: 컨텐츠 별 호/불호 평점 (rating) - 수정본의 카테고리 선택
 // 아이콘 대분류 한 줄과 선택한 대분류의 소분류 한 줄.
-export default function RatingCategoryNav({
-  categories,
-  cate,
-  subcate,
-}: RatingCategoryNavProps) {
-  const current =
-    categories.find((category) => category.slug === cate) ?? categories[0];
-  const subcategories = [
-    { slug: "", name: "전체", href: `/rating/cate/${current.slug}` },
-    ...current.subcategories.map((subcategory) => ({
-      ...subcategory,
-      href: `/rating/cate/${current.slug}/${subcategory.slug}`,
-    })),
-  ];
+export default function RatingCategoryNav({ cate, subcate }: RatingCategoryNavProps) {
+  const current = RATING_CATEGORIES.find((category) => category.slug === cate);
+  const subcategories = current
+    ? [
+        { slug: "", name: "전체", href: `/rating/cate/${current.slug}` },
+        ...current.subcategories.map((subcategory) => ({
+          ...subcategory,
+          href: `/rating/cate/${current.slug}/${subcategory.slug}`,
+        })),
+      ]
+    : [];
+
+  const tileStyle = (selected: boolean) =>
+    ({
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      height: 88,
+      border: "1px solid #222",
+      borderRadius: 8,
+      background: selected ? "#111" : "#fff",
+      color: selected ? "#fff" : "#111",
+      fontSize: 13,
+      fontWeight: 700,
+    }) as const;
 
   return (
     <nav
@@ -34,14 +46,26 @@ export default function RatingCategoryNav({
       <ul
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))",
           gap: 8,
-          paddingBottom: 20,
-          borderBottom: "1px solid #222",
+          paddingBottom: current ? 20 : 0,
+          borderBottom: current ? "1px solid #222" : "none",
           listStyle: "none",
         }}
       >
-        {categories.map((category) => {
+        <li>
+          <Link
+            href="/rating"
+            aria-current={!current ? "page" : undefined}
+            style={tileStyle(!current)}
+          >
+            <span aria-hidden style={{ fontSize: 18, lineHeight: "21px" }}>
+              ☰
+            </span>
+            전체
+          </Link>
+        </li>
+        {RATING_CATEGORIES.map((category) => {
           const selected = category === current;
 
           return (
@@ -49,20 +73,7 @@ export default function RatingCategoryNav({
               <Link
                 href={`/rating/cate/${category.slug}`}
                 aria-current={selected ? "page" : undefined}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                  height: 88,
-                  border: "1px solid #222",
-                  borderRadius: 8,
-                  background: selected ? "#111" : "#fff",
-                  color: selected ? "#fff" : "#111",
-                  fontSize: 13,
-                  fontWeight: 700,
-                }}
+                style={tileStyle(selected)}
               >
                 <Image
                   src={category.icon}
@@ -81,47 +92,40 @@ export default function RatingCategoryNav({
         })}
       </ul>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 30,
-          marginTop: 16,
-        }}
-      >
-        <p style={{ flexShrink: 0, fontSize: 12, color: "#555" }}>
-          {current.name}
-        </p>
-        <ul
-          aria-label="하위 카테고리"
-          style={{ display: "flex", flexWrap: "wrap", gap: 8, listStyle: "none" }}
-        >
-          {subcategories.map((subcategory) => {
-            const selected = (subcate ?? "") === subcategory.slug;
+      {current && (
+        <div style={{ display: "flex", alignItems: "center", gap: 30, marginTop: 16 }}>
+          <p style={{ flexShrink: 0, fontSize: 12, color: "#555" }}>{current.name}</p>
+          <ul
+            aria-label="하위 카테고리"
+            style={{ display: "flex", flexWrap: "wrap", gap: 8, listStyle: "none" }}
+          >
+            {subcategories.map((subcategory) => {
+              const selected = (subcate ?? "") === subcategory.slug;
 
-            return (
-              <li key={subcategory.slug}>
-                <Link
-                  href={subcategory.href}
-                  aria-current={selected ? "page" : undefined}
-                  style={{
-                    display: "block",
-                    padding: "6px 12px",
-                    border: "1px solid #222",
-                    borderRadius: 8,
-                    background: selected ? "#111" : "#fff",
-                    color: selected ? "#fff" : "#555",
-                    fontSize: 12,
-                    fontWeight: selected ? 700 : 400,
-                  }}
-                >
-                  {subcategory.name}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+              return (
+                <li key={subcategory.href}>
+                  <Link
+                    href={subcategory.href}
+                    aria-current={selected ? "page" : undefined}
+                    style={{
+                      display: "block",
+                      padding: "6px 12px",
+                      border: "1px solid #222",
+                      borderRadius: 8,
+                      background: selected ? "#111" : "#fff",
+                      color: selected ? "#fff" : "#555",
+                      fontSize: 12,
+                      fontWeight: selected ? 700 : 400,
+                    }}
+                  >
+                    {subcategory.name}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </nav>
   );
 }

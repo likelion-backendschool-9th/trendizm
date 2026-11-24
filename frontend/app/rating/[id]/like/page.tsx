@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import RatingDetail from "@/app/rating/_components/RatingDetail";
-import type { RatingReview } from "@/app/rating/_components/RatingList";
+import type { RatingReview } from "@/app/rating/_components/RatingDetail";
 
 const CONTENT = {
   title: "콘텐츠 제목",

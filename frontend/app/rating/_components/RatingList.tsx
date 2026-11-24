@@ -1,56 +1,23 @@
 import Link from "next/link";
 import RatingCategoryNav from "@/app/rating/_components/RatingCategoryNav";
+import RatingImage from "@/app/rating/_components/RatingImage";
 import Stars from "@/app/rating/_components/Stars";
+import {
+  DEFAULT_STATUS_LABELS,
+  RATING_STATUSES,
+  findCategory,
+  type RatingStatusSlug,
+} from "@/app/rating/_lib/categories";
+import { formatDate, formatScore } from "@/app/rating/_lib/format";
+import type { RatingContentSummary, SentimentStats } from "@/app/rating/_lib/types";
 import Pagination from "@/components/Pagination";
-
-export type RatingCategory = {
-  slug: string;
-  name: string;
-  // 대분류 칸에 보이는 아이콘. public 폴더 기준 SVG 경로
-  icon: string;
-  subcategories: { slug: string; name: string }[];
-};
-
-export type RatingReview = {
-  id: number;
-  title: string;
-  score: number;
-  watched: string;
-  body: string;
-  createdAt: string;
-  likeCount: number;
-  author: { id: string; nickname: string; tags: string[] };
-};
-
-export type RatingReaction = {
-  count: number;
-  ratio: number;
-  averageScore: number;
-  // 이 반응을 주로 보인 사용자군. 예: { label: "연령", value: "20대" }
-  tags: { label: string; value: string }[];
-  reviews: RatingReview[];
-};
-
-export type RatingContent = {
-  id: number;
-  title: string;
-  category: string;
-  subcategory: string;
-  ageRating: number;
-  status: string;
-  releasedAt: string;
-  season: string;
-  episodeLength: string;
-  like: RatingReaction;
-  dislike: RatingReaction;
-};
+import { toUiPage, type PageResponse } from "@/lib/api/types";
 
 type RatingListProps = {
-  categories: RatingCategory[];
   cate?: string;
   subcate?: string;
-  totalCount: number;
-  contents: RatingContent[];
+  status?: RatingStatusSlug;
+  contents: PageResponse<RatingContentSummary>;
 };
 
 // 관람 등급 배지 색
@@ -62,18 +29,13 @@ const AGE_COLORS: Record<number, string> = {
 
 // 와이어프레임: 컨텐츠 별 호/불호 평점 (rating) - 수정본
 // /rating, /rating/cate/[cate], /rating/cate/[cate]/[subcate]가 함께 쓴다.
-export default function RatingList({
-  categories,
-  cate,
-  subcate,
-  totalCount,
-  contents,
-}: RatingListProps) {
-  const current =
-    categories.find((category) => category.slug === cate) ?? categories[0];
-  const currentSub =
-    current.subcategories.find((subcategory) => subcategory.slug === subcate)
-      ?.name ?? "전체";
+// 목록 API에는 후기가 없어서 카드에는 집계(비율·평균 별점)만 보여 주고, 후기는 상세에서 본다.
+// TODO(rating): 사용자군 태그(TOP5)는 회원 프로필 조회(findProfiles)가 생기면 붙인다.
+export default function RatingList({ cate, subcate, status, contents }: RatingListProps) {
+  const category = cate ? findCategory(cate) : undefined;
+  const statusLabels = category?.statusLabels ?? DEFAULT_STATUS_LABELS;
+  const basePath = ["/rating", cate && `cate/${cate}`, subcate].filter(Boolean).join("/");
+  const currentSub = category?.subcategories.find((sub) => sub.slug === subcate)?.name;
 
   return (
     <main
@@ -99,9 +61,8 @@ export default function RatingList({
         컨텐츠 별 호/불호 평점
       </h1>
 
-      <RatingCategoryNav categories={categories} cate={cate} subcate={subcate} />
+      <RatingCategoryNav cate={cate} subcate={subcate} />
 
-      {/* TODO: 정렬 연결 */}
       <div
         style={{
           display: "flex",
@@ -112,165 +73,164 @@ export default function RatingList({
         }}
       >
         <p style={{ fontSize: 13 }}>
-          {current.name} &gt; {currentSub}{" "}
-          <strong style={{ marginLeft: 4 }}>{totalCount}개</strong>
+          {category ? category.name : "전체"}
+          {currentSub && ` > ${currentSub}`}
+          <strong style={{ marginLeft: 8 }}>{contents.totalElements}개</strong>
+          <span style={{ marginLeft: 8, color: "#777" }}>· 최신 등록순</span>
         </p>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginLeft: "auto",
-            fontSize: 12,
-          }}
+        <ul
+          aria-label="진행 상태"
+          style={{ display: "flex", gap: 6, marginLeft: "auto", listStyle: "none" }}
         >
-          정렬
-          <select
-            name="sort"
-            defaultValue="latest"
-            style={{
-              padding: "5px 8px",
-              border: "1px solid #222",
-              borderRadius: 6,
-              background: "#fff",
-              fontSize: 12,
-            }}
-          >
-            <option value="latest">최신순</option>
-            <option value="reviews">리뷰순</option>
-            <option value="likes">좋아요 많은 순</option>
-            <option value="dislikes">싫어요 많은 순</option>
-            <option value="score">평점 순</option>
-          </select>
-        </label>
+          {[undefined, ...RATING_STATUSES].map((option) => {
+            const selected = option === status;
+            return (
+              <li key={option ?? "all"}>
+                <Link
+                  href={option ? `${basePath}?status=${option}` : basePath}
+                  aria-current={selected ? "page" : undefined}
+                  style={{
+                    display: "block",
+                    padding: "5px 10px",
+                    border: "1px solid #222",
+                    borderRadius: 6,
+                    background: selected ? "#111" : "#fff",
+                    color: selected ? "#fff" : "#111",
+                    fontSize: 12,
+                  }}
+                >
+                  {option ? statusLabels[option] : "전체"}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
-      <section
-        aria-label="콘텐츠 목록"
-        style={{ display: "flex", flexDirection: "column", gap: 24 }}
-      >
-        {contents.map((content) => (
-          <article
-            key={content.id}
-            style={{ padding: 24, border: "1px solid #222", borderRadius: 12 }}
-          >
-            <header style={{ display: "flex", gap: 24 }}>
-              <div
-                aria-hidden
-                style={{
-                  flex: "0 0 112px",
-                  height: 160,
-                  borderRadius: 6,
-                  background: "#ddd",
-                }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 12 }}>
-                  {content.category} &gt; {content.subcategory}
-                </p>
-                <h2
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    marginTop: 8,
-                    fontSize: 24,
-                    fontWeight: 700,
-                  }}
-                >
-                  {content.title}
-                  <span
-                    aria-label={`${content.ageRating}세 이상`}
+      {contents.content.length === 0 ? (
+        <p
+          style={{
+            padding: "48px 0",
+            border: "1px solid #ddd",
+            borderRadius: 12,
+            textAlign: "center",
+            fontSize: 14,
+            color: "#777",
+          }}
+        >
+          아직 등록된 콘텐츠가 없어요.
+        </p>
+      ) : (
+        <section
+          aria-label="콘텐츠 목록"
+          style={{ display: "flex", flexDirection: "column", gap: 24 }}
+        >
+          {contents.content.map((content) => (
+            <article
+              key={content.id}
+              style={{ padding: 24, border: "1px solid #222", borderRadius: 12 }}
+            >
+              <header style={{ display: "flex", gap: 24 }}>
+                <RatingImage src={content.imageUrl} alt={content.title} width={112} height={160} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 12 }}>
+                    {content.category.label} &gt; {content.subcategory.label}
+                  </p>
+                  <h2
                     style={{
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      background: AGE_COLORS[content.ageRating] ?? "#555",
-                      color: "#fff",
-                      fontSize: 11,
-                    }}
-                  >
-                    {content.ageRating}
-                  </span>
-                </h2>
-                <p
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: 14,
-                    marginTop: 10,
-                    fontSize: 12,
-                    color: "#444",
-                  }}
-                >
-                  <span
-                    style={{
-                      padding: "2px 6px",
-                      border: "1px solid #222",
-                      borderRadius: 3,
-                      color: "#111",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      marginTop: 8,
+                      fontSize: 24,
                       fontWeight: 700,
                     }}
                   >
-                    {content.status}
-                  </span>
-                  <span>{content.releasedAt} 공개</span>
-                  <span>{content.season}</span>
-                  <span>{content.episodeLength}</span>
-                </p>
-                <RatioBar like={content.like} dislike={content.dislike} />
+                    <Link href={`/rating/${content.id}/like`}>{content.title}</Link>
+                    {content.ageRating !== null && <AgeBadge age={content.ageRating} />}
+                  </h2>
+                  <p
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: 14,
+                      marginTop: 10,
+                      fontSize: 12,
+                      color: "#444",
+                    }}
+                  >
+                    <span
+                      style={{
+                        padding: "2px 6px",
+                        border: "1px solid #222",
+                        borderRadius: 3,
+                        color: "#111",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {content.status.label}
+                    </span>
+                    {content.releasedAt && <span>{formatDate(content.releasedAt)} 공개</span>}
+                  </p>
+                  <RatioBar stats={content.stats} />
+                </div>
+              </header>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                  gap: 16,
+                  marginTop: 24,
+                }}
+              >
+                <ReactionLink
+                  href={`/rating/${content.id}/like`}
+                  title="좋아한 사람들"
+                  count={content.stats.likeCount}
+                  average={content.stats.likeAverageScore}
+                />
+                <ReactionLink
+                  href={`/rating/${content.id}/dislike`}
+                  title="싫어한 사람들"
+                  count={content.stats.dislikeCount}
+                  average={content.stats.dislikeAverageScore}
+                />
               </div>
-            </header>
+            </article>
+          ))}
+        </section>
+      )}
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                gap: 16,
-                marginTop: 24,
-              }}
-            >
-              <ReactionPanel contentId={content.id} type="like" reaction={content.like} />
-              <ReactionPanel
-                contentId={content.id}
-                type="dislike"
-                reaction={content.dislike}
-              />
-            </div>
-
-            <Link
-              href={`/rating/${content.id}/like`}
-              style={{
-                display: "block",
-                width: 220,
-                margin: "24px 0 0 auto",
-                padding: "9px 0",
-                border: "1px solid #222",
-                borderRadius: 6,
-                textAlign: "center",
-                fontSize: 13,
-                fontWeight: 700,
-              }}
-            >
-              리뷰 전체 보기 ({content.like.count + content.dislike.count})
-            </Link>
-          </article>
-        ))}
-      </section>
-
-      {/* TODO: 실제 현재 페이지와 전체 페이지 수 연결 */}
-      <Pagination currentPage={1} totalPages={10} />
+      <Pagination currentPage={toUiPage(contents.page)} totalPages={contents.totalPages} />
     </main>
   );
 }
 
-function RatioBar({
-  like,
-  dislike,
-}: {
-  like: RatingReaction;
-  dislike: RatingReaction;
-}) {
+/** 관람 등급 배지. 0이면 전체 이용가 */
+export function AgeBadge({ age }: { age: number }) {
+  return (
+    <span
+      aria-label={age === 0 ? "전체 이용가" : `${age}세 이상`}
+      style={{
+        padding: "2px 6px",
+        borderRadius: 4,
+        background: AGE_COLORS[age] ?? "#555",
+        color: "#fff",
+        fontSize: 11,
+      }}
+    >
+      {age === 0 ? "ALL" : age}
+    </span>
+  );
+}
+
+/** 좋아요·싫어요 비율 막대. 후기가 없으면 "-"와 빈 막대 */
+export function RatioBar({ stats }: { stats: SentimentStats }) {
+  const likeRatio = stats.likeRatio;
+  const dislikeRatio = likeRatio === null ? null : 100 - likeRatio;
+
   return (
     <div style={{ marginTop: 22 }}>
       <p
@@ -283,15 +243,15 @@ function RatioBar({
         }}
       >
         <span>
-          좋아요 {like.ratio}%{" "}
+          좋아요 {likeRatio === null ? "-" : `${likeRatio}%`}{" "}
           <span style={{ fontSize: 11, fontWeight: 400, color: "#555" }}>
-            {like.count}명
+            {stats.likeCount}명
           </span>
         </span>
         <span>
-          싫어요 {dislike.ratio}%{" "}
+          싫어요 {dislikeRatio === null ? "-" : `${dislikeRatio}%`}{" "}
           <span style={{ fontSize: 11, fontWeight: 400, color: "#555" }}>
-            {dislike.count}명
+            {stats.dislikeCount}명
           </span>
         </span>
       </p>
@@ -303,149 +263,47 @@ function RatioBar({
           marginTop: 8,
           border: "1px solid #222",
           borderRadius: 4,
-          background: "#ccc",
+          background: likeRatio === null ? "#eee" : "#ccc",
           overflow: "hidden",
         }}
       >
-        <span style={{ width: `${like.ratio}%`, background: "#222" }} />
+        <span style={{ width: `${likeRatio ?? 0}%`, background: "#222" }} />
       </div>
     </div>
   );
 }
 
-function ReactionPanel({
-  contentId,
-  type,
-  reaction,
+function ReactionLink({
+  href,
+  title,
+  count,
+  average,
 }: {
-  contentId: number;
-  type: "like" | "dislike";
-  reaction: RatingReaction;
+  href: string;
+  title: string;
+  count: number;
+  average: number | null;
 }) {
   return (
-    <section style={{ padding: 16, border: "1px solid #222", borderRadius: 6 }}>
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <h3 style={{ fontSize: 14, fontWeight: 400 }}>
-          <Link href={`/rating/${contentId}/${type}`}>
-            {type === "like" ? "좋아한 사람들" : "싫어한 사람들"}
-          </Link>
-        </h3>
-        <p style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-          <Stars score={reaction.averageScore} size={11} />
-          {reaction.averageScore.toFixed(1)}
-        </p>
-      </header>
-
-      <ul
-        aria-label="대표 사용자군"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 6,
-          marginTop: 14,
-          listStyle: "none",
-        }}
-      >
-        {reaction.tags.map((tag) => (
-          <li
-            key={tag.label}
-            style={{
-              padding: "3px 8px",
-              border: "1px solid #222",
-              borderRadius: 4,
-              fontSize: 11,
-            }}
-          >
-            {tag.value}
-          </li>
-        ))}
-      </ul>
-
-      <ul
-        aria-label="후기"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          marginTop: 20,
-          listStyle: "none",
-        }}
-      >
-        {reaction.reviews.map((review) => (
-          <li
-            key={review.id}
-            style={{ padding: "14px 12px", border: "1px solid #222", borderRadius: 6 }}
-          >
-            <div style={{ display: "flex", gap: 8 }}>
-              <span
-                aria-hidden
-                style={{
-                  flexShrink: 0,
-                  width: 28,
-                  height: 28,
-                  border: "1px solid #ddd",
-                  borderRadius: "50%",
-                  background: "#f5f5f5",
-                }}
-              />
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 700 }}>
-                  {review.author.nickname}{" "}
-                  <span style={{ fontSize: 11, fontWeight: 400, color: "#777" }}>
-                    @{review.author.id}
-                  </span>
-                </p>
-                <p style={{ marginTop: 2, fontSize: 10, color: "#555" }}>
-                  {review.author.tags.join(" · ")}
-                </p>
-              </div>
-            </div>
-            <p
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                marginTop: 10,
-                fontSize: 11,
-              }}
-            >
-              <Stars score={review.score} size={10} />
-              {review.score.toFixed(1)}
-              <strong style={{ marginLeft: 8, fontSize: 14 }}>{review.title}</strong>
-            </p>
-            <p style={{ marginTop: 12, fontSize: 12, lineHeight: 1.5 }}>
-              {review.body}
-            </p>
-            <p
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginTop: 12,
-                fontSize: 11,
-              }}
-            >
-              <time>{review.createdAt}</time>
-              <span
-                style={{
-                  padding: "1px 8px",
-                  border: "1px solid #222",
-                  borderRadius: 3,
-                  fontSize: 10,
-                }}
-              >
-                {review.watched}
-              </span>
-            </p>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <Link
+      href={href}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 16,
+        border: "1px solid #222",
+        borderRadius: 6,
+        fontSize: 14,
+      }}
+    >
+      <span>
+        {title} <span style={{ fontSize: 12, color: "#777" }}>후기 {count}개 보기 ›</span>
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Stars score={average ?? 0} size={11} />
+        {formatScore(average)}
+      </span>
+    </Link>
   );
 }
