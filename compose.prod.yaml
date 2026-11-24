@@ -74,7 +74,11 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_OPEN_IN_VIEW: "false"
       TRENDIZM_JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
+      # 밈 문서 썸네일 저장 폴더. read_only라 아래 볼륨으로 붙인 곳에만 쓸 수 있다
+      TRENDIZM_THUMBNAIL_DIR: /data/thumbnails
       TZ: Asia/Seoul
+    volumes:
+      - thumbnail-data:/data/thumbnails
     depends_on:
       postgres:
         condition: service_healthy
@@ -101,3 +105,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  thumbnail-data:
