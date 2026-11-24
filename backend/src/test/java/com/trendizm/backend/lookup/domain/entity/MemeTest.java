@@ -60,4 +60,14 @@ class MemeTest {
         meme.show();
         assertThat(meme.isHidden()).isFalse();
     }
+
+    @Test
+    @DisplayName("썸네일을 비워 두면 유튜브 영상은 썸네일을 채우고, 다른 출처는 비워 두고, 직접 넣은 썸네일은 그대로 쓴다")
+    void 썸네일() {
+        assertThat(Meme.create("TMI", 1L, SOURCE, null, null).getThumbnailUrl())
+                .isEqualTo("https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+        assertThat(Meme.create("TMI", 1L, "https://x.com/someone/status/1", null, null).getThumbnailUrl()).isNull();
+        assertThat(Meme.create("TMI", 1L, SOURCE, null, "https://img.example.com/a.png").getThumbnailUrl())
+                .isEqualTo("https://img.example.com/a.png");
+    }
 }

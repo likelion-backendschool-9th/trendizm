@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class SourceUrlTest {
 
@@ -44,5 +45,29 @@ class SourceUrlTest {
     })
     void 플랫폼_규칙에_안_맞는_주소(String raw, String expected) {
         assertThat(SourceUrl.normalize(raw)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest(name = "{0}의 썸네일은 {1}")
+    @CsvSource({
+            "https://youtu.be/dQw4w9WgXcQ?si=abc, https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            "https://m.youtube.com/watch?v=a_b-1&t=30s, https://i.ytimg.com/vi/a_b-1/hqdefault.jpg",
+            "https://www.youtube.com/shorts/xyz789, https://i.ytimg.com/vi/xyz789/hqdefault.jpg",
+    })
+    void 유튜브_썸네일(String raw, String expected) {
+        assertThat(SourceUrl.youtubeThumbnail(SourceUrl.normalize(raw))).contains(expected);
+    }
+
+    @ParameterizedTest(name = "{0}은 썸네일 없음")
+    @ValueSource(strings = {
+            "https://x.com/someone/status/123",
+            "https://www.instagram.com/p/Cabc/",
+            "https://www.tiktok.com/@user/video/123",
+            "https://www.youtube.com/@channel",
+            "https://example.com/watch?v=abc",
+            // 영상 ID에 영문·숫자·_·- 외의 글자가 있으면 만들지 않는다
+            "https://youtube.com/watch?v=abc%22onerror",
+    })
+    void 유튜브가_아니면_썸네일_없음(String raw) {
+        assertThat(SourceUrl.youtubeThumbnail(SourceUrl.normalize(raw))).isEmpty();
     }
 }

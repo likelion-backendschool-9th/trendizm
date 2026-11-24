@@ -80,9 +80,14 @@ public class Meme extends BaseCreatedEntity {
     }
 
     /** 단어는 normalizeWord, 출처 주소는 SourceUrl.normalize로 바꿔 저장한다. 출처 주소는 필수이고 제목·썸네일은 없으면 null */
+    /** 썸네일을 비워 두면 유튜브 영상은 영상 ID로 썸네일 주소를 채운다. 다른 출처는 비워 둔다(화면에서 기본 이미지) */
     public static Meme create(String word, Long userId, String sourceUrl, String title, String thumbnailUrl) {
         Objects.requireNonNull(sourceUrl, "출처 주소는 필수입니다");
-        return new Meme(normalizeWord(word), userId, SourceUrl.normalize(sourceUrl), title, thumbnailUrl);
+        String normalizedSource = SourceUrl.normalize(sourceUrl);
+        String thumbnail = thumbnailUrl != null
+                ? thumbnailUrl
+                : SourceUrl.youtubeThumbnail(normalizedSource).orElse(null);
+        return new Meme(normalizeWord(word), userId, normalizedSource, title, thumbnail);
     }
 
     /**

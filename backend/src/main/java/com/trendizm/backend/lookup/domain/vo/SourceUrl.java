@@ -5,6 +5,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,6 +25,9 @@ import java.util.regex.Pattern;
  * </ul>
  * 그 밖의 주소는 https로 통일, 호스트 소문자, 앞의 www.·m.·mobile. 제거, # 뒤 제거, 추적 파라미터(utm_* 등) 제거, 끝 / 제거만 한다.
  * 주소로 해석할 수 없는 값은 앞뒤 공백만 지운다.
+ *
+ * <p>썸네일: 유튜브는 영상 ID로 썸네일 주소가 정해져 있어서(youtubeThumbnail) 외부에 접속하지 않고 만든다.
+ * 다른 플랫폼은 규칙이 없어서 만들지 않는다(화면에서 기본 이미지를 보여 준다).
  */
 public final class SourceUrl {
 
@@ -35,6 +39,8 @@ public final class SourceUrl {
     private static final Pattern INSTAGRAM_POST = Pattern.compile("^/(?:[^/]+/)?(?:p|reel|reels|tv)/([\\w-]+)");
     private static final Pattern THREADS_POST = Pattern.compile("^/(@[^/]+)/post/([\\w-]+)");
     private static final Pattern TIKTOK_VIDEO = Pattern.compile("^/(@[^/]+)/video/(\\d+)");
+    /** normalize가 만든 유튜브 주소. 영상 ID는 영문·숫자·_·-만 받는다 */
+    private static final Pattern NORMALIZED_YOUTUBE = Pattern.compile("^https://youtube\\.com/watch\\?v=([\\w-]+)$");
 
     private SourceUrl() {
     }
@@ -61,6 +67,17 @@ public final class SourceUrl {
         String cleanedQuery = removeTrackingParams(query);
         String cleanedPath = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
         return "https://" + host + portPart(uri) + cleanedPath + (cleanedQuery.isEmpty() ? "" : "?" + cleanedQuery);
+    }
+
+    /**
+     * 정규화한 출처가 유튜브 영상이면 그 썸네일 주소. 예: https://youtube.com/watch?v=abc → https://i.ytimg.com/vi/abc/hqdefault.jpg
+     * 유튜브 영상이 아니면 empty
+     */
+    public static Optional<String> youtubeThumbnail(String normalizedUrl) {
+        Matcher matcher = NORMALIZED_YOUTUBE.matcher(normalizedUrl);
+        return matcher.matches()
+                ? Optional.of("https://i.ytimg.com/vi/" + matcher.group(1) + "/hqdefault.jpg")
+                : Optional.empty();
     }
 
     /** 플랫폼 게시물 주소면 정해진 형태로, 아니면 null */
