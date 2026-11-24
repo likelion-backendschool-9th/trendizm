@@ -31,7 +31,8 @@ public class MemeController {
     /** 최근 등록된 문서 목록. keyword를 주면 단어에 keyword가 들어간 문서만. q가 있으면 getMeme이 처리한다 */
     @GetMapping(params = "!q")
     public PageResponse<MemeResponse> getMemes(
-            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false)
+            @Pattern(regexp = TextPattern.NO_CONTROL, message = "검색어에 쓸 수 없는 문자가 들어 있습니다.") String keyword,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "size는 1 이상이어야 합니다.")
@@ -48,7 +49,8 @@ public class MemeController {
     public PageResponse<MemeResponse> getMemesByWord(
             @RequestParam
             @NotBlank(message = "단어를 입력해 주세요.")
-            @Size(max = 100, message = "단어는 100자 이하여야 합니다.") String q,
+            @Size(max = 100, message = "단어는 100자 이하여야 합니다.")
+            @Pattern(regexp = TextPattern.NO_CONTROL, message = "단어에 쓸 수 없는 문자가 들어 있습니다.") String q,
             @RequestParam(required = false)
             @Size(max = 500, message = "출처 주소는 500자 이하여야 합니다.")
             @Pattern(regexp = WebUrlPattern.OPTIONAL, message = "출처 주소는 http:// 또는 https://로 시작하는 올바른 주소여야 합니다.")

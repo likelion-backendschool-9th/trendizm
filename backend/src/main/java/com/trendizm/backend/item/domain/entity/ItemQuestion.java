@@ -13,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnDefault;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -55,6 +56,14 @@ public class ItemQuestion extends BaseTimeEntity {
     @Column(nullable = false, length = 30)
     private ItemQuestionStatus status;
 
+    /**
+     * 조회수. 상세를 볼 때마다 1씩 올린다(같은 사람이 다시 봐도 올라간다).
+     * 이미 있는 행이 있는 DB(ddl-auto: update)에도 칼럼이 추가되도록 DDL 기본값을 0으로 둔다.
+     */
+    @ColumnDefault("0")
+    @Column(nullable = false)
+    private int viewCount;
+
     private ItemQuestion(Long userId, ItemSubcategory subcategory, String title, String content) {
         this.userId = Objects.requireNonNull(userId, "userId");
         this.subcategory = Objects.requireNonNull(subcategory, "subcategory");
@@ -70,6 +79,11 @@ public class ItemQuestion extends BaseTimeEntity {
 
     public boolean isPublic() {
         return status == ItemQuestionStatus.PUBLIC;
+    }
+
+    /** 상세 조회 시 조회수를 1 올린다. 동시에 여러 명이 보면 일부가 덮어써질 수 있지만 조회수라 허용한다 */
+    public void increaseViewCount() {
+        this.viewCount++;
     }
 
     /** 관리자 숨김·숨김 해제 */

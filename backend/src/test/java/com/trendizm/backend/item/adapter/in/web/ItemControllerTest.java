@@ -19,8 +19,10 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.item.application.dto.CreateItemCommand;
 import com.trendizm.backend.item.application.dto.CreateItemQuestionCommand;
 import com.trendizm.backend.item.application.dto.ItemCategoryInfo;
+import com.trendizm.backend.item.application.dto.ItemAdjacentQuestions;
 import com.trendizm.backend.item.application.dto.ItemQuestionQuery;
 import com.trendizm.backend.item.application.dto.ItemQuestionResponse;
+import com.trendizm.backend.item.application.port.ItemCommentSort;
 import com.trendizm.backend.item.application.port.ItemService;
 import com.trendizm.backend.item.domain.enums.ItemCategory;
 import com.trendizm.backend.item.domain.enums.ItemSubcategory;
@@ -43,7 +45,7 @@ class ItemControllerTest {
 
     private static final ItemQuestionResponse QUESTION = new ItemQuestionResponse(1L,
             ItemCategoryInfo.of(ItemCategory.FASHION), ItemCategoryInfo.of(ItemSubcategory.CLOTHING),
-            "양말 추천해주세요", "내용", "질문자", false, 0, 0, LocalDateTime.now(), LocalDateTime.now());
+            "양말 추천해주세요", "내용", "질문자", false, 0, 0, LocalDateTime.now(), LocalDateTime.now(), 3);
 
     @Autowired
     private MockMvc mockMvc;
@@ -75,12 +77,30 @@ class ItemControllerTest {
     @Test
     @DisplayName("로그인하지 않아도 댓글·추천 아이템 목록을 볼 수 있고, 댓글은 기본 10개씩이다")
     void 비로그인_목록() throws Exception {
-        given(itemService.getComments(eq(1L), isNull(), eq(0), eq(10)))
+        given(itemService.getComments(eq(1L), isNull(), eq(ItemCommentSort.LATEST), eq(0), eq(10)))
                 .willReturn(new PageResponse<>(List.of(), 0, 10, 0, 0, false));
         given(itemService.getRecommendations(eq(1L), isNull())).willReturn(List.of());
+        given(itemService.getAdjacentQuestions(1L)).willReturn(new ItemAdjacentQuestions(null, null));
 
-        mockMvc.perform(get("/api/items/1/comments")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/items/1/comments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(10));
         mockMvc.perform(get("/api/items/1/recommendations")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/items/1/adjacent")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("댓글 정렬은 slug(likes)로 받고, 없는 값이면 400 ITEM_INVALID_SORT")
+    void 댓글_정렬() throws Exception {
+        given(itemService.getComments(eq(1L), isNull(), eq(ItemCommentSort.LIKES), eq(0), eq(10)))
+                .willReturn(new PageResponse<>(List.of(), 0, 10, 0, 0, false));
+
+        mockMvc.perform(get("/api/items/1/comments").param("sort", "likes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(10));
+        mockMvc.perform(get("/api/items/1/comments").param("sort", "popular"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ITEM_INVALID_SORT"));
     }
 
     @Test

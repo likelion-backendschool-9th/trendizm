@@ -9,12 +9,14 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.item.application.dto.CreateItemCommand;
 import com.trendizm.backend.item.application.dto.CreateItemCommentCommand;
 import com.trendizm.backend.item.application.dto.CreateItemQuestionCommand;
+import com.trendizm.backend.item.application.dto.ItemAdjacentQuestions;
 import com.trendizm.backend.item.application.dto.ItemCommentResponse;
 import com.trendizm.backend.item.application.dto.ItemQuestionQuery;
 import com.trendizm.backend.item.application.dto.ItemQuestionResponse;
 import com.trendizm.backend.item.application.dto.ItemQuestionSummaryResponse;
 import com.trendizm.backend.item.application.dto.ItemResponse;
 import com.trendizm.backend.item.application.exception.ItemErrorCode;
+import com.trendizm.backend.item.application.port.ItemCommentSort;
 import com.trendizm.backend.item.application.port.ItemService;
 import com.trendizm.backend.item.domain.enums.ItemCategory;
 import com.trendizm.backend.item.domain.enums.ItemSubcategory;
@@ -277,5 +279,59 @@ class ItemServiceTest {
 
         assertThat(itemService.getComments(questionId, null, 0, 20).content().get(0).authorNickname())
                 .isEqualTo("탈퇴한 회원");
+    }
+
+    @Test
+    @DisplayName("상세를 볼 때마다 조회수가 1씩 오르고, 목록에도 같은 조회수가 보인다")
+    void 조회수() {
+        Long questionId = question(ItemSubcategory.CLOTHING);
+
+        assertThat(itemService.getQuestion(questionId, null).viewCount()).isEqualTo(1);
+        assertThat(itemService.getQuestion(questionId, asker).viewCount()).isEqualTo(2);
+        assertThat(itemService.getQuestions(new ItemQuestionQuery(null, null, 0, 20)).content().get(0).viewCount())
+                .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("이전 글은 먼저 올라온 글, 다음 글은 나중에 올라온 글이고 숨긴 글은 건너뛴다. 끝이면 null")
+    void 이전_다음_글() {
+        Long first = question(ItemSubcategory.CLOTHING);
+        Long hidden = question(ItemSubcategory.SHOES);
+        Long middle = question(ItemSubcategory.BAGS);
+        Long last = question(ItemSubcategory.CLOTHING);
+        itemService.changeQuestionVisibility(hidden, false);
+
+        ItemAdjacentQuestions ofMiddle = itemService.getAdjacentQuestions(middle);
+        assertThat(ofMiddle.previous().id()).isEqualTo(first);
+        assertThat(ofMiddle.next().id()).isEqualTo(last);
+        assertThat(ofMiddle.next().title()).isEqualTo("양말 추천해주세요");
+
+        assertThat(itemService.getAdjacentQuestions(first).previous()).isNull();
+        assertThat(itemService.getAdjacentQuestions(last).next()).isNull();
+        assertError(() -> itemService.getAdjacentQuestions(hidden), ItemErrorCode.ITEM_QUESTION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("댓글 공감순은 공감 많은 댓글이 먼저 오고, 같으면 최신 댓글이 먼저 온다. 대댓글은 그대로 댓글 아래에 있다")
+    void 댓글_공감순() {
+        Long questionId = question(ItemSubcategory.CLOTHING);
+        Long older = comment(questionId, null, asker);
+        Long popular = comment(questionId, null, asker);
+        Long newer = comment(questionId, null, recommender);
+        Long reply = comment(questionId, popular, recommender);
+        itemService.likeComment(popular, asker);
+        itemService.likeComment(popular, recommender);
+        itemService.likeComment(older, asker);
+        itemService.likeComment(reply, asker);
+
+        List<ItemCommentResponse> byLikes =
+                itemService.getComments(questionId, null, ItemCommentSort.LIKES, 0, 20).content();
+        assertThat(byLikes).extracting(ItemCommentResponse::id).containsExactly(popular, older, newer);
+        assertThat(byLikes.get(0).replies()).extracting(ItemCommentResponse::id).containsExactly(reply);
+
+        assertThat(itemService.getComments(questionId, null, ItemCommentSort.LATEST, 0, 20).content())
+                .extracting(ItemCommentResponse::id).containsExactly(newer, popular, older);
+        assertThat(itemService.getComments(questionId, null, ItemCommentSort.LIKES, 0, 2).totalElements())
+                .as("페이지 개수는 대댓글을 빼고 센다").isEqualTo(3);
     }
 }
