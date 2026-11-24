@@ -3,6 +3,8 @@ package com.trendizm.backend.item.application.port.in;
 import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.item.application.dto.CreateItemCommand;
+import com.trendizm.backend.item.application.dto.ItemAdjacentQuestions;
+import com.trendizm.backend.item.application.dto.ItemQuestionLinkResponse;
 import com.trendizm.backend.item.application.dto.CreateItemCommentCommand;
 import com.trendizm.backend.item.application.dto.CreateItemQuestionCommand;
 import com.trendizm.backend.item.application.dto.ItemCommentResponse;
@@ -11,6 +13,7 @@ import com.trendizm.backend.item.application.dto.ItemQuestionResponse;
 import com.trendizm.backend.item.application.dto.ItemQuestionSummaryResponse;
 import com.trendizm.backend.item.application.dto.ItemResponse;
 import com.trendizm.backend.item.application.exception.ItemErrorCode;
+import com.trendizm.backend.item.application.port.ItemCommentSort;
 import com.trendizm.backend.item.application.port.ItemService;
 import com.trendizm.backend.item.application.port.out.CountByKey;
 import com.trendizm.backend.item.application.port.out.ItemCommentLikeRepository;
@@ -82,9 +85,23 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
+    @Transactional
     public ItemQuestionResponse getQuestion(Long questionId, Long viewerId) {
         ItemQuestion question = getPublicQuestion(questionId);
+        question.increaseViewCount();
         return toResponse(question, viewerId);
+    }
+
+    @Override
+    public ItemAdjacentQuestions getAdjacentQuestions(Long questionId) {
+        getPublicQuestion(questionId);
+        ItemQuestionLinkResponse previous = questionRepository
+                .findFirstByStatusAndIdLessThanOrderByIdDesc(ItemQuestionStatus.PUBLIC, questionId)
+                .map(ItemQuestionLinkResponse::from).orElse(null);
+        ItemQuestionLinkResponse next = questionRepository
+                .findFirstByStatusAndIdGreaterThanOrderByIdAsc(ItemQuestionStatus.PUBLIC, questionId)
+                .map(ItemQuestionLinkResponse::from).orElse(null);
+        return new ItemAdjacentQuestions(previous, next);
     }
 
     @Override
@@ -104,10 +121,13 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public PageResponse<ItemCommentResponse> getComments(Long questionId, Long viewerId, int page, int size) {
+    public PageResponse<ItemCommentResponse> getComments(Long questionId, Long viewerId, ItemCommentSort sort,
+                                                         int page, int size) {
         getPublicQuestion(questionId);
-        Page<ItemComment> comments = commentRepository.findByQuestionIdAndParentIdIsNull(
-                questionId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id")));
+        Page<ItemComment> comments = sort == ItemCommentSort.LIKES
+                ? commentRepository.findByQuestionIdAndParentIdIsNullOrderByLikes(questionId, PageRequest.of(page, size))
+                : commentRepository.findByQuestionIdAndParentIdIsNull(
+                        questionId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id")));
 
         List<ItemComment> replies = comments.isEmpty()
                 ? List.of()

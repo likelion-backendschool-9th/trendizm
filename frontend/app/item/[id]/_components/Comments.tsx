@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { formatDate } from "@/app/item/_lib/format";
-import type { ItemComment } from "@/app/item/_lib/types";
+import type { ItemComment, ItemCommentSort } from "@/app/item/_lib/types";
 import { apiFetch } from "@/lib/api/client";
 import { ApiError, type PageResponse } from "@/lib/api/types";
 
@@ -15,7 +15,7 @@ type CommentsProps = {
   pageSize: number;
 };
 
-// 댓글 목록(최신순, 대댓글은 오래된 순)과 작성·답글·공감.
+// 댓글 목록(최신순·공감순, 대댓글은 오래된 순)과 작성·답글·공감.
 // 첫 페이지는 서버에서 받고, "더 보기"와 작성 후 새로 고침은 apiFetch로 직접 부른다.
 // 쓰기 요청에서 로그인하지 않았으면 apiFetch가 로그인 화면으로 보낸다.
 export default function Comments({
@@ -29,14 +29,28 @@ export default function Comments({
   const [page, setPage] = useState(initialPage.page);
   const [hasNext, setHasNext] = useState(initialPage.hasNext);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [sort, setSort] = useState<ItemCommentSort>("latest");
+
+  function fetchPage(nextSort: ItemCommentSort, nextPage: number) {
+    return apiFetch<PageResponse<ItemComment>>(
+      `/api/items/${questionId}/comments?sort=${nextSort}&page=${nextPage}&size=${pageSize}`,
+      { redirectOnUnauthorized: false },
+    );
+  }
+
+  /** 정렬을 바꾸거나 새로 고칠 때 첫 페이지부터 다시 받는다 */
+  async function loadFirst(nextSort: ItemCommentSort) {
+    const first = await fetchPage(nextSort, 0);
+    setSort(nextSort);
+    setComments(first.content);
+    setPage(first.page);
+    setHasNext(first.hasNext);
+  }
 
   async function loadMore() {
     setLoadingMore(true);
     try {
-      const next = await apiFetch<PageResponse<ItemComment>>(
-        `/api/items/${questionId}/comments?page=${page + 1}&size=${pageSize}`,
-        { redirectOnUnauthorized: false },
-      );
+      const next = await fetchPage(sort, page + 1);
       setComments((current) => [...current, ...next.content]);
       setPage(next.page);
       setHasNext(next.hasNext);
@@ -45,15 +59,9 @@ export default function Comments({
     }
   }
 
-  /** 새 댓글이 맨 위에 보이도록 첫 페이지부터 다시 받는다. 위쪽 댓글 수도 맞추려고 서버 화면도 새로 고친다 */
+  /** 새 댓글이 보이도록 최신순 첫 페이지부터 다시 받는다. 위쪽 댓글 수도 맞추려고 서버 화면도 새로 고친다 */
   async function reload() {
-    const first = await apiFetch<PageResponse<ItemComment>>(
-      `/api/items/${questionId}/comments?page=0&size=${pageSize}`,
-      { redirectOnUnauthorized: false },
-    );
-    setComments(first.content);
-    setPage(first.page);
-    setHasNext(first.hasNext);
+    await loadFirst("latest");
     router.refresh();
   }
 
@@ -75,9 +83,39 @@ export default function Comments({
 
   return (
     <section id="comments" style={{ marginTop: 12 }}>
-      <h2 style={{ marginBottom: 20, fontSize: 20, fontWeight: 700 }}>
-        댓글 {commentCount}
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 20,
+        }}
+      >
+        <h2 style={{ fontSize: 20, fontWeight: 700 }}>댓글 {commentCount}</h2>
+        <div role="group" aria-label="댓글 정렬" style={{ display: "flex", padding: 3, border: "1px solid #111" }}>
+          {([
+            { slug: "likes", name: "공감순" },
+            { slug: "latest", name: "최신순" },
+          ] as const).map((option) => (
+            <button
+              key={option.slug}
+              type="button"
+              onClick={() => loadFirst(option.slug)}
+              aria-pressed={sort === option.slug}
+              style={{
+                padding: "6px 14px",
+                border: "none",
+                background: sort === option.slug ? "#111" : "#fff",
+                color: sort === option.slug ? "#fff" : "#111",
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              {option.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div style={{ border: "1px solid #111" }}>
         <CommentForm

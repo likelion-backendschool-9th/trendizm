@@ -18,7 +18,8 @@ public record ItemQuestionResponse(
         long commentCount,
         long recommendationCount,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        int viewCount
 ) {
 
     public static ItemQuestionResponse from(ItemQuestion question) {
@@ -33,21 +34,22 @@ public record ItemQuestionResponse(
                 0,
                 0,
                 question.getCreatedAt(),
-                question.getUpdatedAt());
+                question.getUpdatedAt(),
+                question.getViewCount());
     }
 
     public ItemQuestionResponse withAuthor(String authorNickname) {
         return new ItemQuestionResponse(id, category, subcategory, title, content, authorNickname, mine,
-                commentCount, recommendationCount, createdAt, updatedAt);
+                commentCount, recommendationCount, createdAt, updatedAt, viewCount);
     }
 
     public ItemQuestionResponse withMine(boolean mine) {
         return new ItemQuestionResponse(id, category, subcategory, title, content, authorNickname, mine,
-                commentCount, recommendationCount, createdAt, updatedAt);
+                commentCount, recommendationCount, createdAt, updatedAt, viewCount);
     }
 
     public ItemQuestionResponse withCounts(long commentCount, long recommendationCount) {
         return new ItemQuestionResponse(id, category, subcategory, title, content, authorNickname, mine,
-                commentCount, recommendationCount, createdAt, updatedAt);
+                commentCount, recommendationCount, createdAt, updatedAt, viewCount);
     }
 }

@@ -17,6 +17,9 @@ public interface ItemCommentRepository {
     /** 댓글(대댓글 제외) 목록 */
     Page<ItemComment> findByQuestionIdAndParentIdIsNull(Long questionId, Pageable pageable);
 
+    /** 댓글(대댓글 제외) 목록, 공감 많은 순. 같으면 최신 댓글 먼저. pageable의 정렬은 쓰지 않는다 */
+    Page<ItemComment> findByQuestionIdAndParentIdIsNullOrderByLikes(Long questionId, Pageable pageable);
+
     /** 여러 댓글의 대댓글을 오래된 순으로 */
     List<ItemComment> findByParentIdInOrderByIdAsc(Collection<Long> parentIds);
 

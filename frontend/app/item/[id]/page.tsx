@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import Comments from "@/app/item/[id]/_components/Comments";
 import Recommendations from "@/app/item/[id]/_components/Recommendations";
+import ShareButton from "@/app/item/[id]/_components/ShareButton";
 import { findCategory } from "@/app/item/_lib/categories";
 import { fetchAsViewer } from "@/app/item/_lib/fetchAsViewer";
 import { answerLabel, formatDate } from "@/app/item/_lib/format";
 import type {
+  ItemAdjacentQuestions,
   ItemComment,
   ItemQuestion,
   ItemQuestionSummary,
@@ -17,7 +19,8 @@ import { ApiError, type PageResponse } from "@/lib/api/types";
 
 // 와이어프레임: 트렌드 아이템 - 상세페이지 (item/[id]) - 수정본
 // 질문 글, 추천 아이템(잠금 해제·등록), 댓글(작성·답글·공감), 같은 소분류의 다른 질문을 보여 준다.
-// 와이어프레임의 나도 궁금해요·저장·공유·신고 메뉴, 이전/다음 글, 질문자가 찾는 조건은 API가 없어서 뺐다.
+// 조회수, 공유(링크 복사), 이전/다음 글, 댓글 공감순 정렬을 함께 보여 준다.
+// TODO(item): 나도 궁금해요·저장·신고·차단(ERD 추가 후), 질문자가 찾는 조건(질문 등록 때 선택), 해결 상태(기준 정한 뒤)
 
 const COMMENT_PAGE_SIZE = 10;
 const SIMILAR_SIZE = 5;
@@ -46,7 +49,7 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
     throw error;
   }
 
-  const [recommendations, comments, similar] = await Promise.all([
+  const [recommendations, comments, similar, adjacent] = await Promise.all([
     fetchAsViewer<ItemRecommendation[]>(`/api/items/${id}/recommendations`),
     fetchAsViewer<PageResponse<ItemComment>>(
       `/api/items/${id}/comments?page=0&size=${COMMENT_PAGE_SIZE}`,
@@ -54,6 +57,7 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
     serverFetch<PageResponse<ItemQuestionSummary>>(
       `/api/items?subcategory=${question.subcategory.slug}&size=${SIMILAR_SIZE + 1}`,
     ),
+    serverFetch<ItemAdjacentQuestions>(`/api/items/${id}/adjacent`),
   ]);
   const similarQuestions = similar.content
     .filter((other) => other.id !== question.id)
@@ -167,7 +171,7 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
                 {question.authorNickname}
                 {question.mine && " (나)"}
               </span>
-              · {formatDate(question.createdAt)}
+              · {formatDate(question.createdAt)} · 조회 {question.viewCount}
             </div>
             <p
               style={{
@@ -208,6 +212,9 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
               >
                 💬 댓글 {question.commentCount}
               </a>
+              <span style={{ marginLeft: "auto" }}>
+                <ShareButton title={question.title} />
+              </span>
             </div>
           </article>
 
@@ -222,6 +229,35 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
             initialPage={comments}
             pageSize={COMMENT_PAGE_SIZE}
           />
+
+          <nav aria-label="글 이동">
+            <ul style={{ listStyle: "none", border: "1px solid #111" }}>
+              {[
+                { label: "이전 글", link: adjacent.previous },
+                { label: "다음 글", link: adjacent.next },
+              ].map(({ label, link }, index) => (
+                <li
+                  key={label}
+                  style={{
+                    display: "flex",
+                    gap: 32,
+                    padding: "18px 24px",
+                    borderTop: index === 0 ? "none" : "1px solid #ddd",
+                    fontSize: 14,
+                  }}
+                >
+                  <span style={{ flexShrink: 0, color: "#777" }}>{label}</span>
+                  {link ? (
+                    <Link href={`/item/${link.id}`}>{link.title}</Link>
+                  ) : (
+                    <span style={{ color: "#aaa" }}>
+                      {label === "이전 글" ? "첫 번째 글이에요" : "마지막 글이에요"}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
 
           <Link
             href={`/item/cate/${question.category.slug}/${question.subcategory.slug}`}

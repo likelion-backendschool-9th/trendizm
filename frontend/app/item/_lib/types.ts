@@ -14,6 +14,7 @@ export type ItemQuestionSummary = {
   commentCount: number;
   recommendationCount: number;
   createdAt: string;
+  viewCount: number;
 };
 
 /** GET /api/items/{id} 질문 글 상세 */
@@ -29,7 +30,16 @@ export type ItemQuestion = {
   commentCount: number;
   recommendationCount: number;
   createdAt: string;
+  /** 조회수. 상세를 불러올 때마다 1 오른다 */
+  viewCount: number;
 };
+
+/** GET /api/items/{id}/adjacent 이전/다음 글. previous는 먼저 올라온 글, next는 나중에 올라온 글 (없으면 null) */
+export type ItemQuestionLink = { id: number; title: string };
+export type ItemAdjacentQuestions = { previous: ItemQuestionLink | null; next: ItemQuestionLink | null };
+
+/** 댓글 정렬 (백엔드 ItemCommentSort slug) */
+export type ItemCommentSort = "latest" | "likes";
 
 /** 댓글. 대댓글은 replies에 오래된 순으로 들어 있다 */
 export type ItemComment = {

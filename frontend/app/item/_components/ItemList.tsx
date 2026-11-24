@@ -143,7 +143,7 @@ export default function ItemList({ cate, subcate, questions }: ItemListProps) {
                   }}
                 >
                   {question.authorNickname} | {formatDate(question.createdAt)} |
-                  댓글 {question.commentCount}
+                  댓글 {question.commentCount} | 조회수 {question.viewCount}
                 </p>
               </div>
 

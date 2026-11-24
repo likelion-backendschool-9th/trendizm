@@ -15,6 +15,8 @@ public enum ItemErrorCode implements ErrorCode {
     ITEM_INVALID_PARENT_COMMENT(HttpStatus.BAD_REQUEST, "답글을 달 수 없는 댓글입니다."),
     /** 없는 카테고리 slug */
     ITEM_INVALID_CATEGORY(HttpStatus.BAD_REQUEST, "없는 카테고리입니다."),
+    /** 댓글 정렬 값이 latest·likes가 아닌 경우 */
+    ITEM_INVALID_SORT(HttpStatus.BAD_REQUEST, "없는 정렬 방식입니다."),
     /** 목록 필터의 대분류와 소분류가 서로 맞지 않는 경우 */
     ITEM_CATEGORY_MISMATCH(HttpStatus.BAD_REQUEST, "대분류와 소분류가 맞지 않습니다.");
 
