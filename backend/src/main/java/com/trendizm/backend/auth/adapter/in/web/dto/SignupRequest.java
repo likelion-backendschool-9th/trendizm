@@ -33,4 +33,12 @@ public record SignupRequest(
 
         boolean marketingAgreed
 ) {
+
+    /** 실수로 로그에 찍혀도 비밀번호가 보이지 않게 한다 (LoginRequest와 같음) */
+    @Override
+    public String toString() {
+        return "SignupRequest[email=" + email + ", password=***, nickname=" + nickname
+                + ", agreeTerms=" + agreeTerms + ", agreePrivacy=" + agreePrivacy
+                + ", marketingAgreed=" + marketingAgreed + "]";
+    }
 }
