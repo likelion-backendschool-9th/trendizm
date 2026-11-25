@@ -23,7 +23,24 @@ export type RatingContentSummary = {
   ageRating: number | null;
   releasedAt: string | null;
   stats: SentimentStats;
+  /** 좋아요·싫어요 후기 중 공감 많은 순 최대 2개 (목록에서만 온다. mine·likedByMe는 항상 false) */
+  likePreviews?: RatingReviewItem[];
+  dislikePreviews?: RatingReviewItem[];
 };
+
+/** 콘텐츠 목록 정렬 (백엔드 RatingContentSort slug) */
+export const CONTENT_SORTS = [
+  { slug: "latest", name: "최신순" },
+  { slug: "reviews", name: "리뷰순" },
+  { slug: "likes", name: "좋아요 많은 순" },
+  { slug: "dislikes", name: "싫어요 많은 순" },
+  { slug: "score", name: "평점 순" },
+] as const;
+export type ContentSort = (typeof CONTENT_SORTS)[number]["slug"];
+
+export function isContentSort(value: string | undefined): value is ContentSort {
+  return CONTENT_SORTS.some((sort) => sort.slug === value);
+}
 
 /** GET /api/ratings/{id} 콘텐츠 상세. extra 키는 RatingContentExtraKey (season, episodeLength) */
 export type RatingContentDetail = RatingContentSummary & {

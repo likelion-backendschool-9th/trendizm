@@ -43,4 +43,7 @@ public interface RatingRepository {
 
     /** 콘텐츠·호불호별 후기 수와 평균 별점. 후기가 없는 조합은 결과에 없다 */
     List<SentimentCount> countGroupByContentIdAndSentiment(Collection<Long> contentIds);
+
+    /** 목록 미리보기용. 콘텐츠·호불호마다 공감 많은 후기를 limit개씩 (같으면 최신 후기). 순서는 보장하지 않는다 */
+    List<Rating> findTopLikedByContentIds(Collection<Long> contentIds, int limit);
 }

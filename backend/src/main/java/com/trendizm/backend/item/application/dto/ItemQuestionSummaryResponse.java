@@ -16,7 +16,8 @@ public record ItemQuestionSummaryResponse(
         String authorNickname,
         long commentCount,
         long recommendationCount,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        int viewCount
 ) {
 
     static final int PREVIEW_LENGTH = 100;
@@ -31,17 +32,18 @@ public record ItemQuestionSummaryResponse(
                 null,
                 0,
                 0,
-                question.getCreatedAt());
+                question.getCreatedAt(),
+                question.getViewCount());
     }
 
     public ItemQuestionSummaryResponse withAuthor(String authorNickname) {
         return new ItemQuestionSummaryResponse(id, category, subcategory, title, contentPreview,
-                authorNickname, commentCount, recommendationCount, createdAt);
+                authorNickname, commentCount, recommendationCount, createdAt, viewCount);
     }
 
     public ItemQuestionSummaryResponse withCounts(long commentCount, long recommendationCount) {
         return new ItemQuestionSummaryResponse(id, category, subcategory, title, contentPreview,
-                authorNickname, commentCount, recommendationCount, createdAt);
+                authorNickname, commentCount, recommendationCount, createdAt, viewCount);
     }
 
     private static String preview(String content) {

@@ -7,8 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.trendizm.backend.auth.application.port.AuthService;
 import com.trendizm.backend.feed.application.port.FeedService;
 import com.trendizm.backend.item.application.port.ItemService;
+import com.trendizm.backend.lookup.application.port.MemeCommentService;
 import com.trendizm.backend.lookup.application.port.MemeInterpretationService;
 import com.trendizm.backend.lookup.application.port.MemeService;
+import com.trendizm.backend.lookup.application.port.MemeThumbnailService;
 import com.trendizm.backend.notification.application.port.NotificationService;
 import com.trendizm.backend.point.application.port.PointService;
 import com.trendizm.backend.ranking.application.port.RankingService;
@@ -44,6 +46,7 @@ class SecurityConfigTest {
             "/api/auth", true,
             "/api/feeds", true,
             "/api/items", true,
+            "/api/lookup/comments", true,
             "/api/lookup/interpretations", true,
             "/api/lookup/memes", true,
             "/api/rankings", true,
@@ -67,7 +70,9 @@ class SecurityConfigTest {
     @MockitoBean private FeedService feedService;
     @MockitoBean private ItemService itemService;
     @MockitoBean private MemeService memeService;
+    @MockitoBean private MemeCommentService memeCommentService;
     @MockitoBean private MemeInterpretationService memeInterpretationService;
+    @MockitoBean private MemeThumbnailService memeThumbnailService;
     @MockitoBean private NotificationService notificationService;
     @MockitoBean private PointService pointService;
     @MockitoBean private RankingService rankingService;

@@ -18,6 +18,15 @@ public enum MemeErrorCode implements ErrorCode {
     /** 투표 종류가 agree, disagree가 아님 */
     MEME_INVALID_VOTE_TYPE(HttpStatus.BAD_REQUEST, "투표 종류는 agree 또는 disagree여야 합니다."),
 
+    /** 댓글이 없거나, 삭제됐거나, 그 댓글의 문서가 숨김 상태 */
+    MEME_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
+
+    /** 다른 의견의 댓글이거나, 대댓글·삭제된 댓글에 답글을 달려고 한 경우 */
+    MEME_INVALID_PARENT_COMMENT(HttpStatus.BAD_REQUEST, "답글을 달 수 없는 댓글입니다."),
+
+    /** 다른 사람의 댓글을 수정·삭제하려고 한 경우 */
+    MEME_COMMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "내가 쓴 댓글만 수정·삭제할 수 있습니다."),
+
     /** normalizeWord로 바꾼 단어가 word 칼럼 길이(100자)를 넘음. 예: "İ"는 소문자로 바꾸면 2글자가 된다 */
     MEME_WORD_TOO_LONG(HttpStatus.BAD_REQUEST, "단어가 너무 깁니다. 100자 이하로 입력해 주세요."),
 

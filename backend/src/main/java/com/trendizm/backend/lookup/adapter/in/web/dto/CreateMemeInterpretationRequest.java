@@ -1,5 +1,6 @@
 package com.trendizm.backend.lookup.adapter.in.web.dto;
 
+import com.trendizm.backend.lookup.adapter.in.web.TextPattern;
 import com.trendizm.backend.lookup.adapter.in.web.WebUrlPattern;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import jakarta.validation.constraints.NotBlank;
@@ -9,20 +10,27 @@ import jakarta.validation.constraints.Size;
 /**
  * 단어·출처로 의견 작성. 같은 단어·출처의 문서가 있으면 거기에 붙고, 없으면 문서도 함께 만든다.
  * 단어는 경로가 아니라 본문으로 받는다('/'·'%'가 들어간 단어 때문). 출처 주소는 필수다.
- * 제목·썸네일은 선택이고, 이 의견으로 문서가 새로 만들어질 때만 저장된다.
- * 주소 검증 규칙은 WebUrlPattern을 따른다(http·https만, 보이지 않는 문자 금지).
+ * 제목은 선택이고, 이 의견으로 문서가 새로 만들어질 때만 저장된다. 썸네일은 받지 않고 서버가 출처에서 가져온다.
+ * 출처 주소 검증 규칙은 WebUrlPattern을 따른다(http·https만, 보이지 않는 문자 금지).
+ * 글 검증 규칙은 TextPattern을 따른다(단어·뜻·내용은 보이는 글자 필수, 제목까지 제어 문자 금지).
  * 예: { "word": "알잘딱깔센", "meaning": "알아서 잘 딱 깔끔하고 센스 있게", "content": "...", "sourceUrl": "https://..." }
  */
 public record CreateMemeInterpretationRequest(
         @NotBlank(message = "단어를 입력해 주세요.")
+        @Pattern(regexp = TextPattern.HAS_VISIBLE, message = "단어를 입력해 주세요.")
+        @Pattern(regexp = TextPattern.NO_CONTROL, message = "단어에 쓸 수 없는 문자가 들어 있습니다.")
         @Size(max = 100, message = "단어는 100자 이하여야 합니다.")
         String word,
 
         @NotBlank(message = "뜻을 입력해 주세요.")
+        @Pattern(regexp = TextPattern.HAS_VISIBLE, message = "뜻을 입력해 주세요.")
+        @Pattern(regexp = TextPattern.NO_CONTROL, message = "뜻에 쓸 수 없는 문자가 들어 있습니다.")
         @Size(max = 100, message = "뜻은 100자 이하여야 합니다.")
         String meaning,
 
         @NotBlank(message = "내용을 입력해 주세요.")
+        @Pattern(regexp = TextPattern.HAS_VISIBLE, message = "내용을 입력해 주세요.")
+        @Pattern(regexp = TextPattern.NO_CONTROL, message = "내용에 쓸 수 없는 문자가 들어 있습니다.")
         @Size(max = 5000, message = "내용은 5000자 이하여야 합니다.")
         String content,
 
@@ -32,16 +40,13 @@ public record CreateMemeInterpretationRequest(
         String sourceUrl,
 
         @Size(max = 255, message = "출처 제목은 255자 이하여야 합니다.")
-        String title,
-
-        @Size(max = 500, message = "썸네일 주소는 500자 이하여야 합니다.")
-        @Pattern(regexp = WebUrlPattern.OPTIONAL, message = "썸네일 주소는 http:// 또는 https://로 시작하는 올바른 주소여야 합니다.")
-        String thumbnailUrl
+        @Pattern(regexp = TextPattern.NO_CONTROL, message = "출처 제목에 쓸 수 없는 문자가 들어 있습니다.")
+        String title
 ) {
 
     public CreateMemeInterpretationCommand toCommand(Long userId) {
         return new CreateMemeInterpretationCommand(
-                word, userId, meaning.strip(), content.strip(), sourceUrl.strip(), blankToNull(title), blankToNull(thumbnailUrl));
+                word, userId, meaning.strip(), content.strip(), sourceUrl.strip(), blankToNull(title));
     }
 
     private static String blankToNull(String value) {

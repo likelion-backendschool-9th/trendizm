@@ -4,7 +4,10 @@ import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
+import com.trendizm.backend.lookup.application.dto.MemeCreatedEvent;
+import com.trendizm.backend.lookup.application.dto.MemeInterpretationAddedEvent;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
+import com.trendizm.backend.lookup.application.dto.MemeInterpretationVotedEvent;
 import com.trendizm.backend.lookup.application.dto.MemeVoteResult;
 import com.trendizm.backend.lookup.application.dto.VoteMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
@@ -28,6 +31,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -46,6 +50,8 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     private final MemeInterpretationRepository interpretationRepository;
     private final MemeInterpretationVoteRepository voteRepository;
     private final MemberService memberService;
+    /** 커밋 뒤 처리할 이벤트를 발행한다: 알림(notification)·썸네일 저장(MemeThumbnailServiceImpl). lookup은 알림 도메인을 직접 부르지 않는다 */
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 문서 생성과 의견 저장이 한 트랜잭션이라, 의견 저장이 실패하면 새 문서도 롤백되어 빈 문서가 남지 않는다 */
     @Override
@@ -71,7 +77,7 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
         if (meme.isHidden()) {
             throw new BusinessException(MemeErrorCode.MEME_NOT_FOUND);
         }
-        return saveInterpretation(meme.getId(), command.userId(), command.meaning(), command.content());
+        return saveInterpretation(meme, command.userId(), command.meaning(), command.content());
     }
 
     @Override
@@ -80,20 +86,26 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
         Meme meme = memeRepository.findById(command.memeId())
                 .filter(found -> !found.isHidden())
                 .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
-        return saveInterpretation(meme.getId(), command.userId(), command.meaning(), command.content());
+        return saveInterpretation(meme, command.userId(), command.meaning(), command.content());
     }
 
-    private MemeInterpretationResponse saveInterpretation(Long memeId, Long userId, String meaning, String content) {
+    /** 문서 주인에게 새 해석 알림이 가도록 이벤트를 발행한다. 주인이 직접 쓴 해석이면 알림 쪽에서 거른다 */
+    private MemeInterpretationResponse saveInterpretation(Meme meme, Long userId, String meaning, String content) {
         MemeInterpretation interpretation =
-                interpretationRepository.save(MemeInterpretation.create(memeId, userId, meaning, content));
+                interpretationRepository.save(MemeInterpretation.create(meme.getId(), userId, meaning, content));
+        eventPublisher.publishEvent(new MemeInterpretationAddedEvent(
+                meme.getId(), interpretation.getId(), meme.getUserId(), userId, meme.getWord()));
         return MemeInterpretationResponse.from(interpretation).withAuthor(nicknames(Set.of(userId)).get(userId));
     }
 
     private Meme createMeme(CreateMemeInterpretationCommand command) {
-        Meme meme = Meme.create(command.word(), command.userId(), command.sourceUrl(), command.title(), command.thumbnailUrl());
+        Meme meme = Meme.create(command.word(), command.userId(), command.sourceUrl(), command.title());
         try {
             // 위 조회와 저장 사이에 다른 요청이 같은 단어·출처로 문서를 만들면 DB (word, source_url) UNIQUE에서 막힌다
-            return memeRepository.saveAndFlush(meme);
+            Meme saved = memeRepository.saveAndFlush(meme);
+            // 썸네일은 이 트랜잭션이 커밋된 뒤 따로 받아 저장한다(MemeThumbnailServiceImpl). 롤백되면 실행되지 않는다
+            eventPublisher.publishEvent(new MemeCreatedEvent(saved.getId()));
+            return saved;
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(MemeErrorCode.MEME_ALREADY_EXISTS);
         }
@@ -118,19 +130,32 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     /**
      * 투표 수는 실제로 바뀐 행이 있을 때만 고친다(insertIfAbsent·changeType의 반환값).
      * 그래서 같은 사람이 동시에 여러 번 보내도 수가 한 번만 바뀐다.
+     * 동의가 새로 들어왔을 때만(처음 동의, 비동의 → 동의) 해석 작성자에게 알림 이벤트를 발행한다.
      */
     @Override
     @Transactional
     public MemeVoteResult vote(VoteMemeInterpretationCommand command) {
-        Long interpretationId = getVisibleInterpretation(command.interpretationId()).getId();
+        MemeInterpretation interpretation = interpretationRepository.findById(command.interpretationId())
+                .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
+        // 공개 여부를 확인하며 읽은 문서를 알림 이벤트의 단어에도 쓴다(다시 조회하지 않는다)
+        Meme meme = getVisibleMeme(interpretation);
+        Long interpretationId = interpretation.getId();
         MemeVoteType type = command.type();
         boolean agree = type == MemeVoteType.AGREE;
+        boolean changed = false;
         if (voteRepository.insertIfAbsent(interpretationId, command.userId(), type.name()) == 1) {
             interpretationRepository.addVoteCounts(interpretationId, agree ? 1 : 0, agree ? 0 : 1);
+            changed = true;
         } else if (voteRepository.changeType(interpretationId, command.userId(), type) == 1) {
             interpretationRepository.addVoteCounts(interpretationId, agree ? 1 : -1, agree ? -1 : 1);
+            changed = true;
         }
-        return currentState(interpretationId, command.userId());
+        MemeVoteResult result = currentState(interpretationId, command.userId());
+        if (changed && agree) {
+            eventPublisher.publishEvent(new MemeInterpretationVotedEvent(meme.getId(), interpretationId,
+                    interpretation.getUserId(), command.userId(), meme.getWord(), result.agreeCount()));
+        }
+        return result;
     }
 
     @Override
@@ -151,11 +176,15 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     private MemeInterpretation getVisibleInterpretation(Long interpretationId) {
         MemeInterpretation interpretation = interpretationRepository.findById(interpretationId)
                 .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
-        boolean visible = memeRepository.findById(interpretation.getMemeId()).filter(meme -> !meme.isHidden()).isPresent();
-        if (!visible) {
-            throw new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND);
-        }
+        getVisibleMeme(interpretation);
         return interpretation;
+    }
+
+    /** 해석이 달린 문서. 문서가 없거나 숨겨졌으면 해석도 없는 것으로 본다(MEME_INTERPRETATION_NOT_FOUND) */
+    private Meme getVisibleMeme(MemeInterpretation interpretation) {
+        return memeRepository.findById(interpretation.getMemeId())
+                .filter(meme -> !meme.isHidden())
+                .orElseThrow(() -> new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
     }
 
     /**

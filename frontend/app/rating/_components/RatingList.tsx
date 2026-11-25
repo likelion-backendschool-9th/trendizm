@@ -1,6 +1,7 @@
 import Link from "next/link";
 import RatingCategoryNav from "@/app/rating/_components/RatingCategoryNav";
 import RatingImage from "@/app/rating/_components/RatingImage";
+import SortSelect from "@/app/rating/_components/SortSelect";
 import Stars from "@/app/rating/_components/Stars";
 import {
   DEFAULT_STATUS_LABELS,
@@ -9,7 +10,12 @@ import {
   type RatingStatusSlug,
 } from "@/app/rating/_lib/categories";
 import { formatDate, formatScore } from "@/app/rating/_lib/format";
-import type { RatingContentSummary, SentimentStats } from "@/app/rating/_lib/types";
+import type {
+  ContentSort,
+  RatingContentSummary,
+  RatingReviewItem,
+  SentimentStats,
+} from "@/app/rating/_lib/types";
 import Pagination from "@/components/Pagination";
 import { toUiPage, type PageResponse } from "@/lib/api/types";
 
@@ -17,6 +23,7 @@ type RatingListProps = {
   cate?: string;
   subcate?: string;
   status?: RatingStatusSlug;
+  sort: ContentSort;
   contents: PageResponse<RatingContentSummary>;
 };
 
@@ -29,9 +36,9 @@ const AGE_COLORS: Record<number, string> = {
 
 // 와이어프레임: 컨텐츠 별 호/불호 평점 (rating) - 수정본
 // /rating, /rating/cate/[cate], /rating/cate/[cate]/[subcate]가 함께 쓴다.
-// 목록 API에는 후기가 없어서 카드에는 집계(비율·평균 별점)만 보여 주고, 후기는 상세에서 본다.
+// 카드에는 집계(비율·평균 별점)와 좋아요·싫어요 후기 미리보기(공감 많은 순 2개씩)를 보여 준다.
 // TODO(rating): 사용자군 태그(TOP5)는 회원 프로필 조회(findProfiles)가 생기면 붙인다.
-export default function RatingList({ cate, subcate, status, contents }: RatingListProps) {
+export default function RatingList({ cate, subcate, status, sort, contents }: RatingListProps) {
   const category = cate ? findCategory(cate) : undefined;
   const statusLabels = category?.statusLabels ?? DEFAULT_STATUS_LABELS;
   const basePath = ["/rating", cate && `cate/${cate}`, subcate].filter(Boolean).join("/");
@@ -76,7 +83,6 @@ export default function RatingList({ cate, subcate, status, contents }: RatingLi
           {category ? category.name : "전체"}
           {currentSub && ` > ${currentSub}`}
           <strong style={{ marginLeft: 8 }}>{contents.totalElements}개</strong>
-          <span style={{ marginLeft: 8, color: "#777" }}>· 최신 등록순</span>
         </p>
         <ul
           aria-label="진행 상태"
@@ -87,7 +93,7 @@ export default function RatingList({ cate, subcate, status, contents }: RatingLi
             return (
               <li key={option ?? "all"}>
                 <Link
-                  href={option ? `${basePath}?status=${option}` : basePath}
+                  href={listHref(basePath, option, sort)}
                   aria-current={selected ? "page" : undefined}
                   style={{
                     display: "block",
@@ -105,6 +111,7 @@ export default function RatingList({ cate, subcate, status, contents }: RatingLi
             );
           })}
         </ul>
+        <SortSelect basePath={basePath} status={status} sort={sort} />
       </div>
 
       {contents.content.length === 0 ? (
@@ -185,17 +192,19 @@ export default function RatingList({ cate, subcate, status, contents }: RatingLi
                   marginTop: 24,
                 }}
               >
-                <ReactionLink
+                <ReactionPanel
                   href={`/rating/${content.id}/like`}
                   title="좋아한 사람들"
                   count={content.stats.likeCount}
                   average={content.stats.likeAverageScore}
+                  previews={content.likePreviews ?? []}
                 />
-                <ReactionLink
+                <ReactionPanel
                   href={`/rating/${content.id}/dislike`}
                   title="싫어한 사람들"
                   count={content.stats.dislikeCount}
                   average={content.stats.dislikeAverageScore}
+                  previews={content.dislikePreviews ?? []}
                 />
               </div>
             </article>
@@ -273,37 +282,94 @@ export function RatioBar({ stats }: { stats: SentimentStats }) {
   );
 }
 
-function ReactionLink({
+/** 목록 주소. 진행 상태와 정렬을 쿼리로 붙이고, 기본값(전체·최신순)은 뺀다 */
+function listHref(basePath: string, status: RatingStatusSlug | undefined, sort: ContentSort): string {
+  const query = new URLSearchParams();
+  if (status) {
+    query.set("status", status);
+  }
+  if (sort !== "latest") {
+    query.set("sort", sort);
+  }
+  const search = query.toString();
+  return search ? `${basePath}?${search}` : basePath;
+}
+
+/** 좋아요·싫어요 칸. 평균 별점, 후기 수, 공감 많은 후기 미리보기 */
+function ReactionPanel({
   href,
   title,
   count,
   average,
+  previews,
 }: {
   href: string;
   title: string;
   count: number;
   average: number | null;
+  previews: RatingReviewItem[];
 }) {
   return (
-    <Link
-      href={href}
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 16,
-        border: "1px solid #222",
-        borderRadius: 6,
-        fontSize: 14,
-      }}
-    >
-      <span>
-        {title} <span style={{ fontSize: 12, color: "#777" }}>후기 {count}개 보기 ›</span>
-      </span>
-      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Stars score={average ?? 0} size={11} />
-        {formatScore(average)}
-      </span>
-    </Link>
+    <section style={{ padding: 16, border: "1px solid #222", borderRadius: 6 }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={{ fontSize: 14, fontWeight: 400 }}>
+          <Link href={href}>
+            {title} <span style={{ fontSize: 12, color: "#777" }}>후기 {count}개 ›</span>
+          </Link>
+        </h3>
+        <p style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+          <Stars score={average ?? 0} size={11} />
+          {formatScore(average)}
+        </p>
+      </header>
+
+      {previews.length === 0 ? (
+        <p style={{ marginTop: 16, fontSize: 12, color: "#777" }}>아직 후기가 없어요.</p>
+      ) : (
+        <ul
+          aria-label="후기 미리보기"
+          style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16, listStyle: "none" }}
+        >
+          {previews.map((review) => (
+            <li key={review.id} style={{ padding: "12px", border: "1px solid #222", borderRadius: 6 }}>
+              <p style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                <strong>{review.authorNickname}</strong>
+                <span style={{ color: "#777" }}>♥ {review.likeCount}</span>
+              </p>
+              <p style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 11 }}>
+                <Stars score={review.score} size={10} />
+                <strong style={{ fontSize: 13 }}>{review.title}</strong>
+              </p>
+              <p
+                style={{
+                  marginTop: 8,
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  // 두 줄이 넘으면 말줄임표로 자른다
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {review.body}
+              </p>
+              <p
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: 8,
+                  fontSize: 11,
+                  color: "#777",
+                }}
+              >
+                <time>{formatDate(review.createdAt)}</time>
+                {review.progress !== null && <span>{review.progress}화까지 봄</span>}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

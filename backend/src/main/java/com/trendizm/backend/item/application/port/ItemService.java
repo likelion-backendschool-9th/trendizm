@@ -2,6 +2,7 @@ package com.trendizm.backend.item.application.port;
 
 import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.item.application.dto.CreateItemCommand;
+import com.trendizm.backend.item.application.dto.ItemAdjacentQuestions;
 import com.trendizm.backend.item.application.dto.CreateItemCommentCommand;
 import com.trendizm.backend.item.application.dto.CreateItemQuestionCommand;
 import com.trendizm.backend.item.application.dto.ItemCommentResponse;
@@ -21,7 +22,11 @@ public interface ItemService {
     /** 공개 질문 글 목록 (최신순) */
     PageResponse<ItemQuestionSummaryResponse> getQuestions(ItemQuestionQuery query);
 
+    /** 질문 글 상세. 볼 때마다 조회수를 1 올린다 */
     ItemQuestionResponse getQuestion(Long questionId, Long viewerId);
+
+    /** 이전/다음 글 (공개 글 기준). 글이 없거나 숨겨졌으면 ITEM_QUESTION_NOT_FOUND */
+    ItemAdjacentQuestions getAdjacentQuestions(Long questionId);
 
     ItemQuestionResponse createQuestion(CreateItemQuestionCommand command);
 
@@ -32,7 +37,13 @@ public interface ItemService {
     void changeQuestionVisibility(Long questionId, boolean visible);
 
     /** 댓글 목록 (최신순). 댓글마다 대댓글을 오래된 순으로 함께 담는다. page·size는 댓글(대댓글 제외) 기준 */
-    PageResponse<ItemCommentResponse> getComments(Long questionId, Long viewerId, int page, int size);
+    default PageResponse<ItemCommentResponse> getComments(Long questionId, Long viewerId, int page, int size) {
+        return getComments(questionId, viewerId, ItemCommentSort.LATEST, page, size);
+    }
+
+    /** 댓글 목록. sort는 최신순 또는 공감 많은 순이고, 대댓글은 정렬과 상관없이 오래된 순이다 */
+    PageResponse<ItemCommentResponse> getComments(Long questionId, Long viewerId, ItemCommentSort sort,
+                                                  int page, int size);
 
     /** 대댓글은 같은 글의 댓글에만 달 수 있다(대댓글에 답글 불가). 아니면 ITEM_INVALID_PARENT_COMMENT */
     ItemCommentResponse createComment(CreateItemCommentCommand command);

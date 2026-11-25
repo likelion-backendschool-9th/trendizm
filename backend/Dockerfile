@@ -17,6 +17,10 @@ RUN ./gradlew --no-daemon -Dorg.gradle.java.installations.auto-detect=false boot
 FROM eclipse-temurin:21.0.13_9-jre-alpine@sha256:ac05c3c42b7c2f1a52c9bd52f01041fa1958231b15ebeae7420429cbc5baf474
 ENV JAVA_TOOL_OPTIONS="-XX:-UseBASE64Intrinsics"
 RUN addgroup -S app && adduser -S -G app -H app
+# 썸네일 저장 폴더(TRENDIZM_THUMBNAIL_DIR). 운영은 read_only라 이 경로에 볼륨을 붙여 쓴다(compose.prod.yaml).
+# 이미지에 app 소유로 미리 만들어 두면, 빈 볼륨을 처음 붙일 때 이 소유권이 복사되어 app 사용자가 쓸 수 있다.
+# 폴더가 없으면 볼륨이 root 소유로 만들어져 저장이 Permission denied로 실패한다.
+RUN mkdir -p /data/thumbnails && chown app:app /data/thumbnails
 WORKDIR /app
 COPY --from=build /app/app.jar app.jar
 USER app

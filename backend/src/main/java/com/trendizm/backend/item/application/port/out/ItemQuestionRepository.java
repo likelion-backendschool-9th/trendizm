@@ -21,4 +21,10 @@ public interface ItemQuestionRepository {
 
     Page<ItemQuestion> findByStatusAndSubcategory(ItemQuestionStatus status, ItemSubcategory subcategory,
                                                   Pageable pageable);
+
+    /** 이전 글: id가 더 작은 것 중 가장 큰 것 */
+    Optional<ItemQuestion> findFirstByStatusAndIdLessThanOrderByIdDesc(ItemQuestionStatus status, Long id);
+
+    /** 다음 글: id가 더 큰 것 중 가장 작은 것 */
+    Optional<ItemQuestion> findFirstByStatusAndIdGreaterThanOrderByIdAsc(ItemQuestionStatus status, Long id);
 }
