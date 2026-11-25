@@ -31,7 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class MemeControllerTest {
 
     private static final MemeResponse MEME = new MemeResponse(
-            1L, "알잘딱깔센", "https://video.example.com/watch/01", "영상 제목", null, LocalDateTime.now());
+            1L, "알잘딱깔센", "https://video.example.com/watch/01", "영상 제목", null, null, null, LocalDateTime.now());
 
     @Autowired
     private MockMvc mockMvc;
