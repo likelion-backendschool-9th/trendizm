@@ -33,10 +33,13 @@ final class RankingImportRules {
     static final int UPPERCASE_MAX_LETTERS = 4;
 
     /**
-     * category·keyword에 쓸 수 없는 제어 문자(줄바꿈·탭 포함). PostgreSQL은 NULL 문자(U+0000)를 varchar에 저장하거나
-     * 조회 조건으로 쓰지 못해서, 막지 않으면 500이 난다(H2는 받아 줘서 테스트로는 안 보인다).
+     * category·keyword에서 지우는 제어 문자(줄바꿈·탭은 LINE_BREAK로 따로 바꾼다). PostgreSQL은 NULL 문자(U+0000)를
+     * varchar에 저장하거나 조회 조건으로 쓰지 못해서, 남아 있으면 500이 난다(H2는 받아 줘서 테스트로는 안 보인다).
      */
-    private static final Pattern CONTROL = Pattern.compile("\\p{Cc}");
+    private static final Pattern CONTROL = Pattern.compile("[\\p{Cc}&&[^\\t\\n\\r]]");
+
+    /** category·keyword에서 공백 하나로 바꾸는 줄바꿈·탭. 그냥 지우면 앞뒤 단어가 붙어 다른 키워드가 된다 */
+    private static final Pattern LINE_BREAK = Pattern.compile("[\\t\\n\\r]+");
 
     private RankingImportRules() {
     }
@@ -137,20 +140,16 @@ final class RankingImportRules {
         if (platform == null) {
             errors.add(error(line, "platform: 지원하지 않는 플랫폼입니다 (값: " + row.platform() + ")."));
         }
-        String category = strip(row.category());
+        String category = clean(row.category());
         if (category.isEmpty()) {
             errors.add(error(line, "category: 비어 있습니다."));
-        } else if (CONTROL.matcher(category).find()) {
-            errors.add(error(line, "category: 제어 문자가 들어 있습니다."));
         }
         Integer rank = parseRank(strip(row.ranking()), line, errors);
-        String keyword = strip(row.keyword());
+        String keyword = clean(row.keyword());
         if (keyword.isEmpty()) {
             errors.add(error(line, "keyword: 비어 있습니다."));
         } else if (keyword.codePointCount(0, keyword.length()) > KEYWORD_MAX_LENGTH) {
             errors.add(error(line, "keyword: " + KEYWORD_MAX_LENGTH + "자를 넘습니다."));
-        } else if (CONTROL.matcher(keyword).find()) {
-            errors.add(error(line, "keyword: 제어 문자가 들어 있습니다."));
         }
         List<ParsedLink> links = platform == null ? List.of() : parseLinks(row, platform, errors);
         LocalDateTime collectedAt = parseTime(row.collectedAt(), "collected_at", true, line, errors);
@@ -252,6 +251,11 @@ final class RankingImportRules {
 
     private static String strip(String value) {
         return value == null ? "" : value.strip();
+    }
+
+    /** 제어 문자를 지우고, 이어진 줄바꿈·탭은 공백 하나로 바꾼 뒤 앞뒤 공백을 지운다. null이면 빈 문자열 */
+    private static String clean(String value) {
+        return LINE_BREAK.matcher(CONTROL.matcher(strip(value)).replaceAll("")).replaceAll(" ").strip();
     }
 
     private static ErrorResponse.FieldError error(int line, String message) {

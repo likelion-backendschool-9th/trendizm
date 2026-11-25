@@ -186,24 +186,47 @@ class RankingImportServiceTest {
     }
 
     @Test
-    @DisplayName("category·keyword에 제어 문자(NULL 문자, 줄바꿈 등)가 있으면 줄 번호와 함께 알린다. 앞뒤 줄바꿈은 지우고 받는다")
+    @DisplayName("category·keyword의 제어 문자는 지우고 저장한다. 줄바꿈·탭은 공백 하나로 바꾸고, 앞뒤 공백은 지운다")
     void 제어_문자가_있는_키워드() {
-        assertThatThrownBy(() -> rankingService.importRankings(List.of(
+        RankingImportResult result = rankingService.importRankings(List.of(
                 row(2, "챌린지", "1", "곶감\u0000", List.of(), List.of(), List.of()),
-                row(3, "챌린지\u0000", "2", "박스먹방", List.of(), List.of(), List.of()),
-                row(4, "챌린지", "3", "copy\npaste", List.of(), List.of(), List.of()),
-                row(5, "챌린지", "4", "\u0085바보털", List.of(), List.of(), List.of()),
-                row(6, "챌린지", "5", "정상\n", List.of(), List.of(), List.of()))))
+                row(3, "챌린지\u0000", "2", "\u0000 박스\u0085먹방 \u0007", List.of(), List.of(), List.of()),
+                row(4, "\n챌린지", "3", "copy\r\n\u0000\tpaste\n", List.of(), List.of(), List.of())));
+
+        assertThat(result.skipped()).isEmpty();
+        assertThat(rankingService.getLatestSnapshot("instagram", "challenge").rankings())
+                .extracting(RankingResponse::rank, RankingResponse::keyword)
+                .containsExactly(tuple(1, "곶감"), tuple(2, "박스먹방"), tuple(3, "copy paste"));
+    }
+
+    @Test
+    @DisplayName("제어 문자를 지운 뒤에 같은 키워드면 합치고, 길이도 지운 뒤에 센다")
+    void 제어_문자를_지운_뒤_비교() {
+        String longest = "가".repeat(255);
+        RankingImportResult result = rankingService.importRankings(List.of(
+                row(2, "챌린지", "1", "곶감\u0000", List.of(), List.of(), List.of()),
+                row(3, "챌린지", "2", "곶감", List.of(), List.of(), List.of()),
+                row(4, "챌린지", "3", longest + "\u0000", List.of(), List.of(), List.of())));
+
+        assertThat(rankingService.getLatestSnapshot("instagram", "challenge").rankings())
+                .extracting(RankingResponse::rank, RankingResponse::keyword)
+                .containsExactly(tuple(1, "곶감"), tuple(2, longest));
+        assertThat(result.merged()).extracting(MergedKeyword::keyword, MergedKeyword::lines)
+                .containsExactly(tuple("곶감", List.of(2, 3)));
+    }
+
+    @Test
+    @DisplayName("category·keyword가 제어 문자뿐이면 빈 칸과 같이 줄 번호와 함께 알린다")
+    void 제어_문자뿐인_키워드() {
+        assertThatThrownBy(() -> rankingService.importRankings(List.of(
+                row(2, "챌린지", "1", "\u0000", List.of(), List.of(), List.of()),
+                row(3, " \u0000 ", "2", "곶감", List.of(), List.of(), List.of()))))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {
                     assertThat(e.getErrorCode()).isEqualTo(RankingErrorCode.RANKING_CSV_INVALID);
                     assertThat(e.getErrors()).extracting(ErrorResponse.FieldError::field, ErrorResponse.FieldError::message)
-                            .containsExactly(
-                                    tuple("2번째 줄", "keyword: 제어 문자가 들어 있습니다."),
-                                    tuple("3번째 줄", "category: 제어 문자가 들어 있습니다."),
-                                    tuple("4번째 줄", "keyword: 제어 문자가 들어 있습니다."),
-                                    tuple("5번째 줄", "keyword: 제어 문자가 들어 있습니다."));
+                            .containsExactly(tuple("2번째 줄", "keyword: 비어 있습니다."),
+                                    tuple("3번째 줄", "category: 비어 있습니다."));
                 });
-        assertThat(rankingService.getLatestSnapshot("instagram", "challenge").rankings()).isEmpty();
     }
 
     @Test
