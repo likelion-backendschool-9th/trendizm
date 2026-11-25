@@ -21,14 +21,18 @@ import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * memes 테이블. 단어 + 출처 하나당 문서 하나다((word, source_url) UNIQUE).
  * 같은 단어라도 출처마다 쓰임이 다를 수 있어서, 출처가 다르면 문서를 따로 둔다. 출처는 필수다.
  * 문서는 그 단어·출처로 첫 의견을 쓸 때 함께 만들어진다(MemeInterpretationServiceImpl).
  * 작성자는 다른 도메인(member) 엔티티를 참조하지 않고 id만 저장한다.
+ * DynamicUpdate: 변경 감지로 저장할 때 바뀐 칼럼만 UPDATE한다. 비동기로 요약·썸네일을 저장하는 사이
+ * 다른 요청이 바꾼 칼럼(숨김 상태 등)을 읽어 둔 옛 값으로 덮어쓰지 않게 한다.
  */
 @Entity
+@DynamicUpdate
 @Table(name = "memes",
         uniqueConstraints = @UniqueConstraint(name = "uk_memes_word_source_url", columnNames = {"word", "source_url"}))
 @Getter

@@ -10,7 +10,15 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +41,10 @@ class GeminiSummaryGeneratorTest {
     private final AtomicReference<String> requestKey = new AtomicReference<>();
     private final AtomicReference<String> requestBody = new AtomicReference<>();
     private final AtomicInteger requests = new AtomicInteger();
+    /** true면 응답 헤더와 본문 일부만 보내고 멈춘다(본문이 중간에 멈춘 경우) */
+    private final AtomicBoolean stallBody = new AtomicBoolean();
+    private final CountDownLatch release = new CountDownLatch(1);
+    private final MutableClock clock = new MutableClock(Instant.parse("2026-11-25T00:00:00Z"));
 
     @BeforeEach
     void startServer() throws IOException {
@@ -45,7 +57,15 @@ class GeminiSummaryGeneratorTest {
             byte[] body = responseBody.get().getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(status.get(), body.length);
             try (OutputStream out = exchange.getResponseBody()) {
+                if (stallBody.get()) {
+                    out.write(body, 0, body.length / 2);
+                    out.flush();
+                    release.await(10, TimeUnit.SECONDS);
+                    return;
+                }
                 out.write(body);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         });
         server.start();
@@ -53,12 +73,17 @@ class GeminiSummaryGeneratorTest {
 
     @AfterEach
     void stopServer() {
+        release.countDown();
         server.stop(0);
     }
 
     private GeminiSummaryGenerator generator(String key) {
+        return generator(key, Duration.ofSeconds(5));
+    }
+
+    private GeminiSummaryGenerator generator(String key, Duration timeout) {
         return new GeminiSummaryGenerator(key, "gemini-test-lite",
-                URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1beta/models/"));
+                URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1beta/models/"), timeout, clock);
     }
 
     private static String candidate(String finishReason, String partsJson) {
@@ -86,12 +111,82 @@ class GeminiSummaryGeneratorTest {
     }
 
     @Test
-    @DisplayName("생각(thought) 파트는 빼고 글 파트만 이어 붙인다. 길이 제한(MAX_TOKENS)에 걸린 글도 쓴다")
+    @DisplayName("생각(thought) 파트는 빼고 글 파트만 이어 붙인다")
     void 생각_파트_제외() {
-        responseBody.set(candidate("MAX_TOKENS",
+        responseBody.set(candidate("STOP",
                 "[{\"text\":\"내부 생각\",\"thought\":true},{\"text\":\"요약 앞부분\"},{\"text\":\" 뒷부분\"}]"));
 
         assertThat(generator("k").summarize("tmi", OPINIONS)).contains("요약 앞부분 뒷부분");
+    }
+
+    @Test
+    @DisplayName("길이 제한(MAX_TOKENS)으로 끊긴 글은 마지막 완성 문장까지만 쓰고, 완성 문장이 없으면 말줄임표를 붙인다")
+    void 길이_제한으로_끊긴_응답() {
+        responseBody.set(candidate("MAX_TOKENS", "[{\"text\":\"첫 문장이다. 버전 1.5를 말한다! 세 번째 문장은 중간에\"}]"));
+        assertThat(generator("k").summarize("tmi", OPINIONS)).contains("첫 문장이다. 버전 1.5를 말한다!");
+
+        responseBody.set(candidate("MAX_TOKENS", "[{\"text\":\"완성된 문장 없이 중간에\"}]"));
+        assertThat(generator("k").summarize("tmi", OPINIONS)).contains("완성된 문장 없이 중간에…");
+    }
+
+    @Test
+    @DisplayName("본문이 중간에 멈추면 응답 헤더를 받은 뒤라도 전체 시간 제한에서 끊고 empty")
+    void 본문_멈춤_시간_초과() {
+        responseBody.set(candidate("STOP", "[{\"text\":\"" + "가".repeat(200) + "\"}]"));
+        stallBody.set(true);
+
+        long start = System.nanoTime();
+        assertThat(generator("k", Duration.ofMillis(500)).summarize("tmi", OPINIONS)).isEmpty();
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(5));
+    }
+
+    @Test
+    @DisplayName("429를 받으면 retryDelay(최소 1분)만큼 모든 문서의 호출을 멈추고, 지나면 다시 부른다")
+    void 한도_초과_전체_중단() {
+        GeminiSummaryGenerator generator = generator("k");
+        status.set(429);
+        responseBody.set("{\"error\":{\"code\":429,\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.RetryInfo\","
+                + "\"retryDelay\":\"90s\"}]}}");
+
+        assertThat(generator.summarize("tmi", OPINIONS)).isEmpty();
+        assertThat(generator.isEnabled()).isFalse();
+        assertThat(generator.summarize("다른 단어", OPINIONS)).isEmpty();
+        assertThat(requests.get()).isEqualTo(1);
+
+        clock.advance(Duration.ofSeconds(89));
+        assertThat(generator.isEnabled()).isFalse();
+        clock.advance(Duration.ofSeconds(1));
+        status.set(200);
+        responseBody.set(candidate("STOP", "[{\"text\":\"요약\"}]"));
+        assertThat(generator.isEnabled()).isTrue();
+        assertThat(generator.summarize("tmi", OPINIONS)).contains("요약");
+        assertThat(requests.get()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("retryDelay가 없거나 형식이 다르면 1분, 너무 길면 1시간까지만 멈춘다")
+    void 한도_초과_멈추는_시간() {
+        assertThat(GeminiSummaryGenerator.retryDelay("{\"error\":{\"code\":429}}")).isEmpty();
+        assertThat(GeminiSummaryGenerator.retryDelay("JSON이 아님")).isEmpty();
+        assertThat(GeminiSummaryGenerator.retryDelay("{\"error\":{\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.RetryInfo\","
+                + "\"retryDelay\":\"12.5s\"}]}}")).contains(Duration.ofSeconds(12));
+
+        GeminiSummaryGenerator generator = generator("k");
+        status.set(429);
+        responseBody.set("{\"error\":{\"code\":429,\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.RetryInfo\","
+                + "\"retryDelay\":\"86400s\"}]}}");
+        generator.summarize("tmi", OPINIONS);
+        clock.advance(Duration.ofMinutes(59));
+        assertThat(generator.isEnabled()).isFalse();
+        clock.advance(Duration.ofMinutes(1));
+        assertThat(generator.isEnabled()).isTrue();
+
+        responseBody.set("{\"error\":{\"code\":429}}");
+        generator.summarize("tmi", OPINIONS);
+        clock.advance(Duration.ofSeconds(59));
+        assertThat(generator.isEnabled()).isFalse();
+        clock.advance(Duration.ofSeconds(1));
+        assertThat(generator.isEnabled()).isTrue();
     }
 
     @Test
@@ -115,15 +210,46 @@ class GeminiSummaryGeneratorTest {
     }
 
     @Test
-    @DisplayName("키가 비어 있으면 꺼진 상태라 요청을 보내지 않는다. 모델 이름 형식이 이상하면 시작할 때 막는다")
+    @DisplayName("키가 비어 있거나 헤더에 넣을 수 없는 문자(한글·공백·줄바꿈)가 있으면 꺼진 상태라 요청을 보내지 않는다. 모델 이름 형식이 이상하면 시작할 때 막는다")
     void 꺼짐과_모델_이름() {
-        GeminiSummaryGenerator disabled = generator("  ");
-
-        assertThat(disabled.isEnabled()).isFalse();
-        assertThat(disabled.summarize("tmi", OPINIONS)).isEmpty();
+        for (String key : List.of("  ", "AIza키 # 주석", "AIza key", "AIza\nkey")) {
+            GeminiSummaryGenerator disabled = generator(key);
+            assertThat(disabled.isEnabled()).as(key).isFalse();
+            assertThat(disabled.summarize("tmi", OPINIONS)).as(key).isEmpty();
+        }
         assertThat(requests.get()).isZero();
-        assertThat(generator("k").isEnabled()).isTrue();
-        assertThatThrownBy(() -> new GeminiSummaryGenerator("k", "../other:generateContent?x=", URI.create("http://127.0.0.1/")))
+        assertThat(generator(" AIza-k_1 ").isEnabled()).isTrue();
+        assertThatThrownBy(() -> new GeminiSummaryGenerator("k", "../other:generateContent?x=", URI.create("http://127.0.0.1/"),
+                Duration.ofSeconds(1), clock))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /** 테스트에서 시간을 직접 옮기는 시계 */
+    private static final class MutableClock extends Clock {
+
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
     }
 }

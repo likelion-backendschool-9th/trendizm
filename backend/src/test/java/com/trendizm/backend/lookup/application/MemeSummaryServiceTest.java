@@ -24,7 +24,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +37,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 의견 AI 요약. AI 호출(MemeSummaryGenerator)은 mock으로 바꾼다.
@@ -179,15 +183,65 @@ class MemeSummaryServiceTest {
     }
 
     @Test
-    @DisplayName("AI가 지시보다 길게 써도 500자까지만 저장한다")
+    @DisplayName("AI가 지시보다 길게 써도 500자 안에서 마지막 완성 문장까지만 저장하고, 완성 문장이 없으면 말줄임표를 붙인다")
     void 길이_제한() {
+        saveOpinion("뜻1", 1, 0);
+        saveOpinion("뜻2", 0, 0);
+        given(summaryGenerator.summarize(eq("tmi"), anyList())).willReturn(Optional.of("가나다라마바사 문장이다. ".repeat(60)));
+
+        summaryService.refreshSummary(memeId);
+
+        assertThat(meme().getAiSummary()).hasSizeLessThanOrEqualTo(500).endsWith("문장이다.");
+    }
+
+    @Test
+    @DisplayName("완성 문장 없이 500자를 넘으면 499자에 말줄임표를 붙여 500자로 저장한다")
+    void 길이_제한_문장_없음() {
         saveOpinion("뜻1", 1, 0);
         saveOpinion("뜻2", 0, 0);
         given(summaryGenerator.summarize(eq("tmi"), anyList())).willReturn(Optional.of("가".repeat(800)));
 
         summaryService.refreshSummary(memeId);
 
-        assertThat(meme().getAiSummary()).hasSize(500);
+        assertThat(meme().getAiSummary()).hasSize(500).isEqualTo("가".repeat(499) + "…");
+    }
+
+    @Test
+    @DisplayName("AI를 기다리는 동안에는 트랜잭션도 EntityManager도 붙잡고 있지 않는다 (DB 연결을 반환한 상태)")
+    void AI_호출_중_연결_반환() {
+        saveOpinion("뜻1", 1, 0);
+        saveOpinion("뜻2", 0, 0);
+        AtomicBoolean transactionActive = new AtomicBoolean(true);
+        AtomicReference<Map<Object, Object>> resources = new AtomicReference<>();
+        given(summaryGenerator.summarize(eq("tmi"), anyList())).willAnswer(invocation -> {
+            transactionActive.set(TransactionSynchronizationManager.isActualTransactionActive());
+            resources.set(TransactionSynchronizationManager.getResourceMap());
+            return Optional.of("요약");
+        });
+
+        summaryService.refreshSummary(memeId);
+
+        assertThat(transactionActive).isFalse();
+        assertThat(resources.get()).isEmpty();
+        assertThat(meme().getAiSummary()).isEqualTo("요약");
+    }
+
+    @Test
+    @DisplayName("AI를 기다리는 사이 문서가 숨겨지면 요약을 저장하지 않고 숨김 상태도 그대로 둔다")
+    void AI_호출_중_숨김() {
+        saveOpinion("뜻1", 1, 0);
+        saveOpinion("뜻2", 0, 0);
+        given(summaryGenerator.summarize(eq("tmi"), anyList())).willAnswer(invocation -> {
+            Meme hidden = meme();
+            hidden.hide();
+            memeRepository.save(hidden);
+            return Optional.of("숨긴 뒤 도착한 요약");
+        });
+
+        summaryService.refreshSummary(memeId);
+
+        assertThat(meme().getAiSummary()).isNull();
+        assertThat(meme().isHidden()).isTrue();
     }
 
     @Test
