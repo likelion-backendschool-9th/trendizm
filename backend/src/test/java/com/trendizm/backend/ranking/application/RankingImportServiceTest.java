@@ -186,6 +186,37 @@ class RankingImportServiceTest {
     }
 
     @Test
+    @DisplayName("category·keyword에 제어 문자(NULL 문자, 줄바꿈 등)가 있으면 줄 번호와 함께 알린다. 앞뒤 줄바꿈은 지우고 받는다")
+    void 제어_문자가_있는_키워드() {
+        assertThatThrownBy(() -> rankingService.importRankings(List.of(
+                row(2, "챌린지", "1", "곶감\u0000", List.of(), List.of(), List.of()),
+                row(3, "챌린지\u0000", "2", "박스먹방", List.of(), List.of(), List.of()),
+                row(4, "챌린지", "3", "copy\npaste", List.of(), List.of(), List.of()),
+                row(5, "챌린지", "4", "\u0085바보털", List.of(), List.of(), List.of()),
+                row(6, "챌린지", "5", "정상\n", List.of(), List.of(), List.of()))))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(RankingErrorCode.RANKING_CSV_INVALID);
+                    assertThat(e.getErrors()).extracting(ErrorResponse.FieldError::field, ErrorResponse.FieldError::message)
+                            .containsExactly(
+                                    tuple("2번째 줄", "keyword: 제어 문자가 들어 있습니다."),
+                                    tuple("3번째 줄", "category: 제어 문자가 들어 있습니다."),
+                                    tuple("4번째 줄", "keyword: 제어 문자가 들어 있습니다."),
+                                    tuple("5번째 줄", "keyword: 제어 문자가 들어 있습니다."));
+                });
+        assertThat(rankingService.getLatestSnapshot("instagram", "challenge").rankings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("관련 게시물 제목의 제어 문자는 지우고 저장한다")
+    void 제어_문자가_있는_제목() {
+        rankingService.importRankings(List.of(row(2, "챌린지", "1", "곶감", List.of("Da0E9_oBZM-", "DZrXQRiSv6q"),
+                List.of(), List.of("곶감\u0000 챌린지", "\u0000"))));
+
+        assertThat(rankingService.getLatestSnapshot("instagram", "challenge").rankings().getFirst().links())
+                .extracting(RankingLinkResponse::title).containsExactly("곶감 챌린지", null);
+    }
+
+    @Test
     @DisplayName("한 파일의 collected_at·started_at은 모든 줄이 같아야 한다")
     void 수집_시각이_다른_줄() {
         assertThatThrownBy(() -> rankingService.importRankings(List.of(

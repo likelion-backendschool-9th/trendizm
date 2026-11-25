@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * 순위 CSV 업로드(POST /api/admin/rankings)에서 DB를 쓰지 않는 부분: 줄마다 값 검사와 카테고리 안의 키워드 정리.
@@ -30,6 +31,12 @@ final class RankingImportRules {
 
     /** 대소문자만 다른 키워드를 합칠 때, 영문자가 이 수 이하면 대문자로, 넘으면 소문자로 저장한다 */
     static final int UPPERCASE_MAX_LETTERS = 4;
+
+    /**
+     * category·keyword에 쓸 수 없는 제어 문자(줄바꿈·탭 포함). PostgreSQL은 NULL 문자(U+0000)를 varchar에 저장하거나
+     * 조회 조건으로 쓰지 못해서, 막지 않으면 500이 난다(H2는 받아 줘서 테스트로는 안 보인다).
+     */
+    private static final Pattern CONTROL = Pattern.compile("\\p{Cc}");
 
     private RankingImportRules() {
     }
@@ -133,6 +140,8 @@ final class RankingImportRules {
         String category = strip(row.category());
         if (category.isEmpty()) {
             errors.add(error(line, "category: 비어 있습니다."));
+        } else if (CONTROL.matcher(category).find()) {
+            errors.add(error(line, "category: 제어 문자가 들어 있습니다."));
         }
         Integer rank = parseRank(strip(row.ranking()), line, errors);
         String keyword = strip(row.keyword());
@@ -140,6 +149,8 @@ final class RankingImportRules {
             errors.add(error(line, "keyword: 비어 있습니다."));
         } else if (keyword.codePointCount(0, keyword.length()) > KEYWORD_MAX_LENGTH) {
             errors.add(error(line, "keyword: " + KEYWORD_MAX_LENGTH + "자를 넘습니다."));
+        } else if (CONTROL.matcher(keyword).find()) {
+            errors.add(error(line, "keyword: 제어 문자가 들어 있습니다."));
         }
         List<ParsedLink> links = platform == null ? List.of() : parseLinks(row, platform, errors);
         LocalDateTime collectedAt = parseTime(row.collectedAt(), "collected_at", true, line, errors);

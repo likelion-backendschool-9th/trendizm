@@ -9,6 +9,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -37,7 +38,13 @@ public class TrendRankingLink {
     /** 주소 최대 길이 (칼럼 varchar(500)) */
     public static final int URL_MAX_LENGTH = 500;
 
-    /** 게시물 제목(캡션 등). 255자를 넘으면 잘라서 저장하고, 비어 있으면 null */
+    /**
+     * 제목에서 지우는 제어 문자. 줄바꿈과 탭은 남긴다. PostgreSQL은 NULL 문자(U+0000)를 varchar에 저장하지 못해서
+     * 그대로 저장하면 500이 난다(H2는 받아 줘서 테스트로는 안 보인다).
+     */
+    private static final Pattern CONTROL = Pattern.compile("[\\p{Cc}&&[^\\t\\n\\r]]");
+
+    /** 게시물 제목(캡션 등). 제어 문자를 지운다. 255자를 넘으면 잘라서 저장하고, 비어 있으면 null */
     @Column(length = TITLE_MAX_LENGTH)
     private String title;
 
@@ -75,14 +82,17 @@ public class TrendRankingLink {
     }
 
     /**
-     * 앞뒤 공백을 지우고, 비어 있으면 null, 255자를 넘으면 앞 255자만 남긴다.
+     * 제어 문자와 앞뒤 공백을 지우고, 비어 있으면 null, 255자를 넘으면 앞 255자만 남긴다.
      * 글자 수는 DB(varchar)처럼 코드 포인트로 센다. 이모지처럼 자바 문자 2개인 글자가 중간에서 잘리지 않는다.
      */
     static String normalizeTitle(String title) {
-        if (title == null || title.isBlank()) {
+        if (title == null) {
             return null;
         }
-        String stripped = title.strip();
+        String stripped = CONTROL.matcher(title).replaceAll("").strip();
+        if (stripped.isEmpty()) {
+            return null;
+        }
         if (stripped.codePointCount(0, stripped.length()) <= TITLE_MAX_LENGTH) {
             return stripped;
         }

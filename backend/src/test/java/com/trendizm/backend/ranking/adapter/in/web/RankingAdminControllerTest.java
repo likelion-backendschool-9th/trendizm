@@ -1,6 +1,7 @@
 package com.trendizm.backend.ranking.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -91,6 +92,28 @@ class RankingAdminControllerTest {
         RankingImportRow second = rows.get(1);
         assertThat(second.postAuthors()).isEmpty();
         assertThat(second.postTitles()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("쉼표만 있거나 공백뿐인 줄은 건너뛴다 (엑셀에서 저장하면 끝에 붙는 줄). 뒤 줄의 번호는 그대로다")
+    void 쉼표만_있는_줄() throws Exception {
+        String csv = HEADER
+                + ",,,,,,,,,\n"
+                + "instagram,챌린지,1,곶감,10,[],[],[],2026-11-23 12:16,\n"
+                + " ,, ,,,,,,,\n"
+                + ",,,\n"
+                + ",,,,,,,,,\n";
+        given(rankingService.importRankings(any())).willReturn(new RankingImportResult(
+                LocalDateTime.of(2026, 11, 23, 12, 16), 1, 0, List.of(), List.of()));
+
+        mockMvc.perform(upload(csv.getBytes(StandardCharsets.UTF_8)).with(ADMIN))
+                .andExpect(status().isCreated());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RankingImportRow>> captor = ArgumentCaptor.forClass(List.class);
+        verify(rankingService).importRankings(captor.capture());
+        assertThat(captor.getValue()).extracting(RankingImportRow::line, RankingImportRow::keyword)
+                .containsExactly(tuple(3, "곶감"));
     }
 
     @Test

@@ -9,6 +9,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,7 @@ import tools.jackson.dataformat.csv.CsvReadFeature;
  * 순위 CSV 본문을 줄마다 RankingImportRow로 바꾼다(CSV → JSON과 같은 구조). 값이 맞는지는 서비스가 검사한다.
  * - 본문은 UTF-8로만 읽고 맨 앞의 BOM은 지운다.
  * - 헤더는 열 이름으로 찾으므로 열 순서는 상관없고, 없는 열이 있으면 거부한다. count 같은 다른 열은 쓰지 않는다.
+ * - 빈 줄과 쉼표만 있는 줄(엑셀에서 저장하면 끝에 붙기도 한다)은 건너뛴다.
  * - 따옴표가 닫히지 않는 등 CSV 문법이 틀리면 그 줄에서 읽기를 멈추고 줄 번호를 알린다.
  * - 열 개수가 헤더와 다르거나 JSON 배열 칸이 틀린 줄은 끝까지 읽어 모두 함께 알린다.
  */
@@ -60,7 +62,7 @@ final class RankingCsvReader {
                     break;
                 }
                 String[] cells = iterator.nextValue();
-                if (cells.length == 1 && cells[0].isBlank()) {
+                if (Arrays.stream(cells).allMatch(String::isBlank)) {
                     continue;
                 }
                 if (columns == null) {

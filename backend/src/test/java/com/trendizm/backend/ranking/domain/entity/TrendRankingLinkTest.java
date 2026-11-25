@@ -20,6 +20,16 @@ class TrendRankingLinkTest {
     }
 
     @Test
+    @DisplayName("제목의 제어 문자는 지운다. 줄바꿈과 탭은 그대로 두고, 길이는 지운 뒤에 센다")
+    void 제어_문자() {
+        assertThat(link("곶감\u0000\u001B \u0085챌린지").getTitle()).isEqualTo("곶감 챌린지");
+        assertThat(link("첫 줄\r\n둘째\t줄").getTitle()).isEqualTo("첫 줄\r\n둘째\t줄");
+        assertThat(link("\u0000 \u0007").getTitle()).isNull();
+        assertThat(link("\u0000 곶감 \u0000").getTitle()).isEqualTo("곶감");
+        assertThat(link("\u0000" + "가".repeat(255)).getTitle()).isEqualTo("가".repeat(255));
+    }
+
+    @Test
     @DisplayName("제목이 255자를 넘으면 앞 255자만 남기고, 이모지(자바 문자 2개)가 중간에서 잘리지 않는다")
     void 긴_제목() {
         assertThat(link("가".repeat(300)).getTitle()).isEqualTo("가".repeat(255));
