@@ -11,9 +11,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.trendizm.backend.auth.adapter.out.security.SecurityConfig;
+import com.trendizm.backend.global.error.BusinessException;
 import com.trendizm.backend.ranking.application.dto.RankingImportResult;
 import com.trendizm.backend.ranking.application.dto.RankingImportRow;
+import com.trendizm.backend.ranking.application.dto.RankingSummaryResult;
+import com.trendizm.backend.ranking.application.exception.RankingErrorCode;
 import com.trendizm.backend.ranking.application.port.RankingService;
+import com.trendizm.backend.ranking.application.port.RankingSummaryService;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -49,6 +53,9 @@ class RankingAdminControllerTest {
 
     @MockitoBean
     private RankingService rankingService;
+
+    @MockitoBean
+    private RankingSummaryService summaryService;
 
     @Test
     @DisplayName("관리자가 올린 CSV를 줄마다 읽어 넘긴다. BOM은 지우고, 따옴표 안의 줄바꿈·쉼표와 배열 안의 null도 읽는다")
@@ -175,6 +182,42 @@ class RankingAdminControllerTest {
         mockMvc.perform(upload(body).with(user("member").roles("USER"))).andExpect(status().isForbidden());
 
         verifyNoInteractions(rankingService);
+    }
+
+    @Test
+    @DisplayName("AI 요약: 플랫폼·카테고리를 넘기고 결과를 준다. overwrite 기본값은 false")
+    void 요약() throws Exception {
+        given(summaryService.summarizeLatest("instagram", "challenge", false)).willReturn(new RankingSummaryResult(
+                "instagram", 1L, LocalDateTime.of(2026, 11, 23, 12, 16),
+                List.of(new RankingSummaryResult.SummarizedKeyword(7L, 1, "걸그립", "소지품을 쥐는 챌린지다.")),
+                List.of(new RankingSummaryResult.SkippedKeyword(8L, 2, "춘배", "이미 요약이 있습니다."))));
+
+        mockMvc.perform(summaries().with(ADMIN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summarized[0].summary").value("소지품을 쥐는 챌린지다."))
+                .andExpect(jsonPath("$.skipped[0].reason").value("이미 요약이 있습니다."));
+
+        mockMvc.perform(summaries().param("overwrite", "true").with(ADMIN)).andExpect(status().isOk());
+        verify(summaryService).summarizeLatest("instagram", "challenge", true);
+    }
+
+    @Test
+    @DisplayName("AI 요약: 파라미터가 없으면 400, AI를 쓸 수 없으면 503, 로그인하지 않으면 401, 관리자가 아니면 403")
+    void 요약_오류() throws Exception {
+        mockMvc.perform(post("/api/admin/rankings/summaries").with(ADMIN)).andExpect(status().isBadRequest());
+        mockMvc.perform(summaries()).andExpect(status().isUnauthorized());
+        mockMvc.perform(summaries().with(user("member").roles("USER"))).andExpect(status().isForbidden());
+        verifyNoInteractions(summaryService);
+
+        given(summaryService.summarizeLatest(any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .willThrow(new BusinessException(RankingErrorCode.RANKING_SUMMARY_NOT_CONFIGURED));
+        mockMvc.perform(summaries().with(ADMIN))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("RANKING_SUMMARY_NOT_CONFIGURED"));
+    }
+
+    private static MockHttpServletRequestBuilder summaries() {
+        return post("/api/admin/rankings/summaries").param("platform", "instagram").param("category", "challenge");
     }
 
     private static MockHttpServletRequestBuilder upload(byte[] body) {

@@ -14,6 +14,7 @@ import com.trendizm.backend.lookup.application.port.MemeThumbnailService;
 import com.trendizm.backend.notification.application.port.NotificationService;
 import com.trendizm.backend.point.application.port.PointService;
 import com.trendizm.backend.ranking.application.port.RankingService;
+import com.trendizm.backend.ranking.application.port.RankingSummaryService;
 import com.trendizm.backend.rating.application.port.RatingService;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,7 @@ class SecurityConfigTest {
     @MockitoBean private NotificationService notificationService;
     @MockitoBean private PointService pointService;
     @MockitoBean private RankingService rankingService;
+    @MockitoBean private RankingSummaryService rankingSummaryService;
     @MockitoBean private RatingService ratingService;
 
     @Test

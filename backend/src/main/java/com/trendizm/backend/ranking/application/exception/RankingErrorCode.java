@@ -19,7 +19,16 @@ public enum RankingErrorCode implements ErrorCode {
     RANKING_CSV_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE,"CSV가 너무 큽니다. 5MB 이하로 올려 주세요."),
 
     /** 순위 CSV 업로드: 같은 플랫폼·카테고리·수집 시각의 스냅샷이 이미 있음 (같은 수집 결과를 다시 올림) */
-    RANKING_SNAPSHOT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 올린 수집 결과입니다.");
+    RANKING_SNAPSHOT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 올린 수집 결과입니다."),
+
+    /** AI 요약: Gemini API 키가 없거나 형식이 틀림 */
+    RANKING_SUMMARY_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "Gemini API 키가 설정되어 있지 않습니다."),
+
+    /** AI 요약: Gemini 한도 초과(429) */
+    RANKING_SUMMARY_RATE_LIMITED(HttpStatus.SERVICE_UNAVAILABLE, "AI 사용 한도를 넘었습니다. 잠시 뒤 다시 시도해 주세요."),
+
+    /** AI 요약: 시간 초과, 차단된 응답, 형식이 틀린 응답 등. 자세한 이유는 서버 로그에 남긴다 */
+    RANKING_SUMMARY_FAILED(HttpStatus.BAD_GATEWAY, "AI 요약을 만들지 못했습니다. 잠시 뒤 다시 시도해 주세요.");
 
     private final HttpStatus status;
     private final String message;
