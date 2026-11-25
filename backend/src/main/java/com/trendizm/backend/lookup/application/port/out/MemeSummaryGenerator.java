@@ -9,7 +9,10 @@ import java.util.Optional;
  */
 public interface MemeSummaryGenerator {
 
-    /** API 키가 설정되어 요약을 만들 수 있으면 true. 키가 없으면(로컬·테스트) 요약 기능만 꺼진다 */
+    /** API 키가 설정되어 있으면 true. 키가 없으면(로컬·테스트) 요약 기능만 꺼진다 */
+    boolean isConfigured();
+
+    /** 지금 요약을 만들 수 있으면 true. 키가 있어도 한도 초과(429)로 잠시 멈춘 동안은 false */
     boolean isEnabled();
 
     /** 단어와 신뢰도순 의견으로 요약을 만든다 */

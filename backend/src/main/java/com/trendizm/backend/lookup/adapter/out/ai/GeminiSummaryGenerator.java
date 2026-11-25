@@ -107,8 +107,13 @@ public class GeminiSummaryGenerator implements MemeSummaryGenerator {
     }
 
     @Override
+    public boolean isConfigured() {
+        return !apiKey.isEmpty();
+    }
+
+    @Override
     public boolean isEnabled() {
-        return !apiKey.isEmpty() && !clock.instant().isBefore(blockedUntil);
+        return isConfigured() && !clock.instant().isBefore(blockedUntil);
     }
 
     @Override

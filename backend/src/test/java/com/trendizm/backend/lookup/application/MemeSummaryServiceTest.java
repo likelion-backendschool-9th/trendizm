@@ -71,6 +71,7 @@ class MemeSummaryServiceTest {
 
     @BeforeEach
     void setUp() {
+        given(summaryGenerator.isConfigured()).willReturn(true);
         given(summaryGenerator.isEnabled()).willReturn(true);
         memeId = memeRepository.save(Meme.create("TMI", 1L, "https://youtu.be/tmi01", null)).getId();
     }
@@ -165,10 +166,14 @@ class MemeSummaryServiceTest {
     }
 
     @Test
-    @DisplayName("API 키가 없거나(꺼짐), 숨김 문서, 없는 문서면 AI를 부르지 않는다")
+    @DisplayName("API 키가 없거나(꺼짐), 한도 초과로 잠시 멈췄거나, 숨김 문서, 없는 문서면 AI를 부르지 않는다")
     void 건너뛰기() {
         saveOpinion("뜻1", 1, 0);
         saveOpinion("뜻2", 0, 0);
+        given(summaryGenerator.isConfigured()).willReturn(false);
+        summaryService.refreshSummary(memeId);
+
+        given(summaryGenerator.isConfigured()).willReturn(true);
         given(summaryGenerator.isEnabled()).willReturn(false);
         summaryService.refreshSummary(memeId);
 
