@@ -67,67 +67,98 @@ function timeAgo(iso: string, now: number): string {
   return new Date(iso).toLocaleDateString("ko-KR");
 }
 
+/** 안 읽은 알림 수와, SSE로 값을 받을 때마다 1씩 오르는 version */
+export type UnreadState = {
+  /** null: 아직 모름(숫자를 그리지 않는다) */
+  count: number | null;
+  /**
+   * 같은 해석의 동의는 알림 하나로 묶여서 안 읽은 수가 그대로일 수 있다("동의 3개" → "동의 4개").
+   * 그래도 서버는 이벤트를 보내므로, 펼친 목록은 수 대신 이 값이 바뀔 때 다시 불러온다.
+   */
+  version: number;
+};
+
 /**
  * 안 읽은 알림 수. SSE로 받고, 끊기면 재발급을 거쳐 다시 연결한다.
- * null: 아직 모름(숫자를 그리지 않는다)
+ * 헤더(SiteHeader)에서 한 번만 부르고 값을 🔔(데스크톱·모바일)에 넘긴다. 🔔마다 부르면 탭 하나가 연결을 2개 연다.
+ * - 연결마다 지역 변수(current)로 닫는다. 공유 변수(source)는 "지금 살아 있는 연결"을 가리킬 때만 쓴다.
+ * - 다시 연결하는 중(refreshing)이거나 이미 연결돼 있으면 또 연결하지 않는다. 재연결을 기다리는 동안 탭을 오가도
+ *   연결이 하나만 남는다.
+ * - 처음 연결이 실패하면(페이지를 열 때 토큰이 이미 만료된 경우 등) 기다리지 않고 바로 재발급 후 다시 연결한다.
+ * @param enabled 로그인했을 때만 true. false면 연결하지 않는다
  */
-function useUnreadCount(): number | null {
-  const [count, setCount] = useState<number | null>(null);
+export function useUnreadCount(enabled: boolean): UnreadState {
+  const [state, setState] = useState<UnreadState>({ count: null, version: 0 });
 
   useEffect(() => {
+    if (!enabled) return;
     let source: EventSource | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryDelay = RETRY_MIN_MS;
+    let firstAttempt = true;
+    let refreshing = false;
     let stopped = false;
 
+    function receive(count: number) {
+      setState((previous) => ({ count, version: previous.version + 1 }));
+    }
+
     function connect() {
-      if (stopped) return;
-      source = new EventSource(STREAM_PATH);
-      source.addEventListener("unread-count", (event) => {
+      if (stopped || source !== null) return;
+      const current = new EventSource(STREAM_PATH);
+      source = current;
+      current.addEventListener("unread-count", (event) => {
         retryDelay = RETRY_MIN_MS;
-        setCount((JSON.parse((event as MessageEvent<string>).data) as UnreadCount).count);
+        receive((JSON.parse((event as MessageEvent<string>).data) as UnreadCount).count);
       });
-      source.addEventListener("evicted", () => {
-        source?.close();
-        source = null;
+      current.addEventListener("evicted", () => {
+        current.close();
+        if (source === current) source = null;
       });
       // 끊기면 브라우저의 자동 재연결 대신 직접 다시 연결한다(그 사이에 토큰 재발급을 넣기 위해)
-      source.onerror = () => {
-        source?.close();
+      current.onerror = () => {
+        current.close();
+        if (source !== current) return;
         source = null;
-        scheduleReconnect();
+        scheduleReconnect(firstAttempt ? 0 : retryDelay);
+        firstAttempt = false;
       };
     }
 
-    function scheduleReconnect() {
+    function scheduleReconnect(delay: number) {
       if (stopped || retryTimer !== undefined) return;
       retryTimer = setTimeout(() => {
         retryTimer = undefined;
         void refreshThenConnect();
-      }, retryDelay);
+      }, delay);
       retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
     }
 
     async function refreshThenConnect() {
+      if (stopped || refreshing || source !== null) return;
+      refreshing = true;
       try {
         // 401이면 apiFetch가 재발급을 시도한다. 그래도 401이면 로그아웃된 것이라 멈춘다
         const latest = await apiFetch<UnreadCount>("/api/notifications/unread-count", {
           redirectOnUnauthorized: false,
         });
-        setCount(latest.count);
+        if (stopped) return;
+        receive(latest.count);
         connect();
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           stopped = true;
           return;
         }
-        scheduleReconnect();
+        scheduleReconnect(retryDelay);
+      } finally {
+        refreshing = false;
       }
     }
 
     // 다른 탭에 있다가 돌아왔을 때 끊겨 있으면(밀려난 경우 포함) 바로 다시 연결한다
     function onVisible() {
-      if (document.visibilityState === "visible" && !stopped && source === null) {
+      if (document.visibilityState === "visible" && !stopped && source === null && !refreshing) {
         clearTimeout(retryTimer);
         retryTimer = undefined;
         void refreshThenConnect();
@@ -142,14 +173,15 @@ function useUnreadCount(): number | null {
       source?.close();
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [enabled]);
 
-  return count;
+  return state;
 }
 
-export default function NotificationBell() {
+/** 🔔와 펼친 알림 목록. 안 읽은 수(unread)는 헤더가 useUnreadCount로 받아 넘긴다 */
+export default function NotificationBell({ unread }: { unread: UnreadState }) {
   const router = useRouter();
-  const unreadCount = useUnreadCount();
+  const unreadCount = unread.count;
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   /** 목록을 불러온 시각. "5분 전" 같은 표시의 기준이다 */
@@ -157,7 +189,7 @@ export default function NotificationBell() {
   const [error, setError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 펼칠 때, 그리고 펼친 채로 새 알림이 오면(수가 바뀌면) 목록을 다시 부른다
+  // 펼칠 때, 그리고 펼친 채로 새 알림이 오면(SSE를 받을 때마다 version이 오른다) 목록을 다시 부른다
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -172,7 +204,7 @@ export default function NotificationBell() {
     return () => {
       active = false;
     };
-  }, [open, unreadCount]);
+  }, [open, unread.version]);
 
   // 바깥을 누르거나 Esc를 누르면 닫는다
   useEffect(() => {
@@ -195,11 +227,14 @@ export default function NotificationBell() {
     };
   }, [open]);
 
-  async function openNotification(item: NotificationItem) {
+  function openNotification(item: NotificationItem) {
     setOpen(false);
     if (!item.read) {
-      // 읽음 처리가 실패해도 화면 이동은 한다. 안 읽은 수는 서버가 SSE로 다시 보내 준다
-      await apiFetch(`/api/notifications/${item.id}/read`, { method: "PATCH" }).catch(() => {});
+      // 읽음 처리를 기다리지 않고 바로 이동한다(서버가 느려도 이동은 바로). 실패해도 이동은 하고,
+      // 로그인 화면으로 보내지 않는다. 안 읽은 수는 읽음 처리가 끝나면 서버가 SSE로 다시 보내 준다
+      void apiFetch(`/api/notifications/${item.id}/read`, { method: "PATCH", redirectOnUnauthorized: false }).catch(
+        () => {},
+      );
     }
     router.push(notificationHref(item));
   }
@@ -283,7 +318,7 @@ export default function NotificationBell() {
                 <li key={item.id} style={{ borderBottom: "1px solid #eee" }}>
                   <button
                     type="button"
-                    onClick={() => void openNotification(item)}
+                    onClick={() => openNotification(item)}
                     style={{
                       display: "flex",
                       gap: 8,
