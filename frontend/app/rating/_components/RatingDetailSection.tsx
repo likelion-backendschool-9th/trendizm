@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import RatingDetail from "@/app/rating/_components/RatingDetail";
-import { fetchAsViewer } from "@/app/rating/_lib/fetchAsViewer";
+import RefreshAfterReissue from "@/app/rating/_components/RefreshAfterReissue";
+import { accessTokenExpired, fetchAsViewer } from "@/app/rating/_lib/fetchAsViewer";
 import type { RatingContentDetail, RatingReviewItem, Sentiment } from "@/app/rating/_lib/types";
 import { serverFetch } from "@/lib/api/server";
 import { ApiError, type PageResponse } from "@/lib/api/types";
@@ -31,9 +32,23 @@ export default async function RatingDetailSection({ params, sentiment }: RatingD
     throw error;
   }
 
-  const reviews = await fetchAsViewer<PageResponse<RatingReviewItem>>(
-    `/api/ratings/${id}/reviews?sentiment=${sentiment}&sort=latest&page=0&size=${REVIEW_PAGE_SIZE}`,
-  );
+  const [reviews, authExpired] = await Promise.all([
+    fetchAsViewer<PageResponse<RatingReviewItem>>(
+      `/api/ratings/${id}/reviews?sentiment=${sentiment}&sort=latest&page=0&size=${REVIEW_PAGE_SIZE}`,
+    ),
+    accessTokenExpired(),
+  ]);
 
-  return <RatingDetail content={content} sentiment={sentiment} reviews={reviews} />;
+  return (
+    <>
+      {/* 액세스 토큰만 만료돼 로그인하지 않은 사람 기준으로 그렸으면, 브라우저에서 재발급한 뒤 다시 그린다 */}
+      {authExpired && <RefreshAfterReissue />}
+      <RatingDetail
+        content={content}
+        sentiment={sentiment}
+        reviews={reviews}
+        authExpired={authExpired}
+      />
+    </>
+  );
 }

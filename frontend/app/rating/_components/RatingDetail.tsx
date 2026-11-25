@@ -12,6 +12,8 @@ type RatingDetailProps = {
   content: RatingContentDetail;
   sentiment: Sentiment;
   reviews: PageResponse<RatingReviewItem>;
+  /** 액세스 토큰만 만료돼 로그인하지 않은 사람 기준으로 그렸는지. 재발급 뒤 값이 바뀌면 후기 영역을 새로 그린다 */
+  authExpired: boolean;
 };
 
 const SENTIMENT_NAME: Record<Sentiment, string> = { like: "좋아요", dislike: "싫어요" };
@@ -20,7 +22,7 @@ const SENTIMENT_NAME: Record<Sentiment, string> = { like: "좋아요", dislike: 
 // 콘텐츠 정보, 좋아요·싫어요 탭, 고른 쪽의 집계와 후기 목록·작성 폼을 보여 준다.
 // 와이어프레임의 사용자군 분석(연령·MBTI 등 TOP5)은 회원 프로필 조회(findProfiles)가 생기면 붙인다.
 // 와이어프레임의 상세 댓글 작성은 ERD에서 빠져서 넣지 않는다.
-export default function RatingDetail({ content, sentiment, reviews }: RatingDetailProps) {
+export default function RatingDetail({ content, sentiment, reviews, authExpired }: RatingDetailProps) {
   const extras = extraLabels(content.extra);
   const count = sentiment === "like" ? content.stats.likeCount : content.stats.dislikeCount;
   const average =
@@ -178,8 +180,9 @@ export default function RatingDetail({ content, sentiment, reviews }: RatingDeta
       </section>
 
       <ReviewArea
-        // 탭을 바꾸면 목록·폼 상태를 새로 시작한다
-        key={`${content.id}-${sentiment}`}
+        // 탭을 바꾸면 목록·폼 상태를 새로 시작한다.
+        // 토큰 재발급 뒤에도 새로 시작해야 내 후기·공감 여부가 반영된다(목록을 처음 받은 값으로 상태에 담아 두므로).
+        key={`${content.id}-${sentiment}-${authExpired ? "expired" : "viewer"}`}
         contentId={content.id}
         sentiment={sentiment}
         initialPage={reviews}
