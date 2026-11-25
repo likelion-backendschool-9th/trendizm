@@ -8,6 +8,9 @@ import com.trendizm.backend.global.response.PageResponse;
 import com.trendizm.backend.lookup.application.dto.AddMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.CreateMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.dto.MemeCreatedEvent;
+import com.trendizm.backend.lookup.application.dto.MemeOpinionsChangedEvent;
+import com.trendizm.backend.lookup.application.dto.VoteMemeInterpretationCommand;
+import com.trendizm.backend.lookup.domain.enums.MemeVoteType;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
 import com.trendizm.backend.lookup.application.dto.MemeResponse;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
@@ -117,6 +120,24 @@ class MemeInterpretationServiceTest {
         interpretationService.createInterpretation(command("TMI", TMI_SOURCE));
 
         assertThat(events.stream(MemeCreatedEvent.class)).containsExactly(new MemeCreatedEvent(created.memeId()));
+    }
+
+    @Test
+    @DisplayName("의견 추가, 동의·비동의, 투표 변경·취소가 실제로 일어나면 AI 요약 이벤트를 내고, 바뀐 게 없으면 내지 않는다")
+    void 요약_이벤트() {
+        Long interpretationId = interpretationService.addInterpretation(
+                new AddMemeInterpretationCommand(tmi.getId(), writer, "뜻", "내용")).id();
+        MemeOpinionsChangedEvent changed = new MemeOpinionsChangedEvent(tmi.getId());
+        assertThat(events.stream(MemeOpinionsChangedEvent.class)).containsExactly(changed);
+
+        interpretationService.vote(new VoteMemeInterpretationCommand(interpretationId, reader, MemeVoteType.DISAGREE));
+        interpretationService.vote(new VoteMemeInterpretationCommand(interpretationId, reader, MemeVoteType.DISAGREE));
+        interpretationService.vote(new VoteMemeInterpretationCommand(interpretationId, reader, MemeVoteType.AGREE));
+        interpretationService.cancelVote(interpretationId, reader);
+        interpretationService.cancelVote(interpretationId, reader);
+
+        // 추가 1 + 비동의 1 + (같은 비동의는 없음) + 동의로 변경 1 + 취소 1 + (이미 취소는 없음)
+        assertThat(events.stream(MemeOpinionsChangedEvent.class)).hasSize(4).containsOnly(changed);
     }
 
     @Test
