@@ -8,6 +8,7 @@ import com.trendizm.backend.lookup.application.dto.MemeCreatedEvent;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationAddedEvent;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationResponse;
 import com.trendizm.backend.lookup.application.dto.MemeInterpretationVotedEvent;
+import com.trendizm.backend.lookup.application.dto.MemeOpinionsChangedEvent;
 import com.trendizm.backend.lookup.application.dto.MemeVoteResult;
 import com.trendizm.backend.lookup.application.dto.VoteMemeInterpretationCommand;
 import com.trendizm.backend.lookup.application.exception.MemeErrorCode;
@@ -89,12 +90,16 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
         return saveInterpretation(meme, command.userId(), command.meaning(), command.content());
     }
 
-    /** 문서 주인에게 새 해석 알림이 가도록 이벤트를 발행한다. 주인이 직접 쓴 해석이면 알림 쪽에서 거른다 */
+    /**
+     * 문서 주인에게 새 해석 알림이 가도록 이벤트를 발행한다. 주인이 직접 쓴 해석이면 알림 쪽에서 거른다.
+     * 의견이 늘었으니 AI 요약도 다시 만든다(MemeOpinionsChangedEvent).
+     */
     private MemeInterpretationResponse saveInterpretation(Meme meme, Long userId, String meaning, String content) {
         MemeInterpretation interpretation =
                 interpretationRepository.save(MemeInterpretation.create(meme.getId(), userId, meaning, content));
         eventPublisher.publishEvent(new MemeInterpretationAddedEvent(
                 meme.getId(), interpretation.getId(), meme.getUserId(), userId, meme.getWord()));
+        eventPublisher.publishEvent(new MemeOpinionsChangedEvent(meme.getId()));
         return MemeInterpretationResponse.from(interpretation).withAuthor(nicknames(Set.of(userId)).get(userId));
     }
 
@@ -131,6 +136,7 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
      * 투표 수는 실제로 바뀐 행이 있을 때만 고친다(insertIfAbsent·changeType의 반환값).
      * 그래서 같은 사람이 동시에 여러 번 보내도 수가 한 번만 바뀐다.
      * 동의가 새로 들어왔을 때만(처음 동의, 비동의 → 동의) 해석 작성자에게 알림 이벤트를 발행한다.
+     * 투표가 실제로 바뀌면(동의·비동의 모두) 신뢰도 순서가 달라질 수 있어서 AI 요약 이벤트도 발행한다.
      */
     @Override
     @Transactional
@@ -151,6 +157,9 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
             changed = true;
         }
         MemeVoteResult result = currentState(interpretationId, command.userId());
+        if (changed) {
+            eventPublisher.publishEvent(new MemeOpinionsChangedEvent(meme.getId()));
+        }
         if (changed && agree) {
             eventPublisher.publishEvent(new MemeInterpretationVotedEvent(meme.getId(), interpretationId,
                     interpretation.getUserId(), command.userId(), meme.getWord(), result.agreeCount()));
@@ -161,12 +170,14 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
     @Override
     @Transactional
     public MemeVoteResult cancelVote(Long interpretationId, Long userId) {
-        Long id = getVisibleInterpretation(interpretationId).getId();
+        MemeInterpretation interpretation = getVisibleInterpretation(interpretationId);
+        Long id = interpretation.getId();
         voteRepository.findMyVote(id, userId).ifPresent(vote -> {
             boolean agree = vote.type() == MemeVoteType.AGREE;
             // 조회한 뒤 다른 요청이 먼저 지우거나 바꿨으면 0이 나오고 수를 고치지 않는다
             if (voteRepository.deleteByInterpretationIdAndUserIdAndType(id, userId, vote.type()) == 1) {
                 interpretationRepository.addVoteCounts(id, agree ? -1 : 0, agree ? 0 : -1);
+                eventPublisher.publishEvent(new MemeOpinionsChangedEvent(interpretation.getMemeId()));
             }
         });
         return currentState(id, userId);

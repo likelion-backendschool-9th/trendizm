@@ -1,5 +1,6 @@
 package com.trendizm.backend.global.error;
 
+import java.util.List;
 import lombok.Getter;
 
 /**
@@ -12,14 +13,24 @@ public class BusinessException extends RuntimeException {
 
     private final ErrorCode errorCode;
 
+    /** 응답의 errors에 담을 항목별 오류. 없으면 빈 목록 */
+    private final List<ErrorResponse.FieldError> errors;
+
     public BusinessException(ErrorCode errorCode) {
-        super(errorCode.message());
-        this.errorCode = errorCode;
+        this(errorCode, errorCode.message());
     }
 
     /** ErrorCode의 기본 메시지 대신 상황에 맞는 메시지를 보여 줄 때 쓴다 */
     public BusinessException(ErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
+        this.errors = List.of();
+    }
+
+    /** 여러 항목이 틀렸을 때 항목별 오류를 함께 알린다. 예: CSV의 줄마다 틀린 이유 */
+    public BusinessException(ErrorCode errorCode, List<ErrorResponse.FieldError> errors) {
+        super(errorCode.message());
+        this.errorCode = errorCode;
+        this.errors = List.copyOf(errors);
     }
 }

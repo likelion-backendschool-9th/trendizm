@@ -1,24 +1,18 @@
 package com.trendizm.backend.ranking.adapter.in.web;
 
-import com.trendizm.backend.ranking.adapter.in.web.dto.RankingRequest;
-import com.trendizm.backend.ranking.application.dto.RankingResponse;
+import com.trendizm.backend.ranking.application.dto.RankingSnapshot;
+import com.trendizm.backend.ranking.application.dto.RankingTabs;
 import com.trendizm.backend.ranking.application.port.RankingService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 로그인 없이 모든 요청 허용 (auth/adapter/out/security/SecurityConfig) */
+/**
+ * 트렌드 순위 조회 (WBS 5.4). 조회(GET)는 로그인 없이 허용한다 (auth/adapter/out/security/SecurityConfig).
+ * 순위는 수집 스케줄러(5.2)가 저장하므로 등록·수정·삭제 API는 두지 않는다.
+ */
 @RestController
 @RequestMapping("/api/rankings")
 @RequiredArgsConstructor
@@ -26,30 +20,21 @@ public class RankingController {
 
     private final RankingService rankingService;
 
+    /**
+     * 플랫폼·카테고리의 가장 최근 스냅샷. 예: GET /api/rankings?platform=instagram&amp;category=challenge
+     * platform과 category는 slug(GET /api/rankings/tabs)다. 없는 값이면 404
+     */
     @GetMapping
-    public Page<RankingResponse> getRankings(Pageable pageable) {
-        return rankingService.getRankings(pageable);
+    public RankingSnapshot getRankings(@RequestParam String platform, @RequestParam String category) {
+        return rankingService.getLatestSnapshot(platform, category);
     }
 
-    @GetMapping("/{rankingId}")
-    public RankingResponse getRanking(@PathVariable Long rankingId) {
-        return rankingService.getRanking(rankingId);
-    }
-
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Long createRanking(@Valid @RequestBody RankingRequest request) {
-        return rankingService.createRanking();
-    }
-
-    @PutMapping("/{rankingId}")
-    public void updateRanking(@PathVariable Long rankingId, @Valid @RequestBody RankingRequest request) {
-        rankingService.updateRanking(rankingId);
-    }
-
-    @DeleteMapping("/{rankingId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteRanking(@PathVariable Long rankingId) {
-        rankingService.deleteRanking(rankingId);
+    /**
+     * 순위 화면의 탭. 플랫폼(slug·label)과 카테고리(id·slug·title)를 함께 준다.
+     * 화면은 이 목록으로 플랫폼·카테고리 메뉴를 만들고, 순위 조회에는 두 slug를 쓴다
+     */
+    @GetMapping("/tabs")
+    public RankingTabs getTabs() {
+        return rankingService.getTabs();
     }
 }

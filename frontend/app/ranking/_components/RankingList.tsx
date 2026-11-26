@@ -1,36 +1,36 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import RankingLinks from "@/app/ranking/_components/RankingLinks";
+import type { Ranking, RankingTabs } from "@/app/ranking/_lib/types";
 
-export type RankingFilter = {
-  slug: string;
-  name: string;
-};
-
-export type Ranking = {
-  rank: number;
-  keyword: string;
-  summary: string;
-  links: { id: number; title: string; date: string; description: string }[];
-};
+/** 순위별 상세 카드를 다음 순위로 넘기는 간격 (10초) */
+const ROTATION_INTERVAL_MS = 10_000;
 
 type RankingListProps = {
-  platforms: RankingFilter[];
-  categories: RankingFilter[];
-  platform?: string;
+  /** 플랫폼·카테고리 탭 (GET /api/rankings/tabs) */
+  tabs: RankingTabs;
+  /** 고른 플랫폼 slug */
+  platform: string;
+  /** 고른 카테고리 slug. 카테고리가 하나도 없으면 없다 */
   category?: string;
+  /** 1~10위. 아직 수집 전이면 빈 배열 */
   rankings: Ranking[];
+  /** 이 순위를 수집한 시각(GET /api/rankings의 collectedAt). 아직 수집 전이면 null이거나 없다 */
+  collectedAt?: string | null;
 };
 
 // 와이어프레임: 플랫폼별 트렌드 순위
-// /ranking, /ranking/[platform], /ranking/[platform]/[category]가 함께 쓴다.
+// /ranking/[platform]/[category]가 쓰고, 카테고리가 하나도 없으면 /ranking/[platform]도 쓴다.
+// 순위별 상세 카드는 하나만 펼치고 ROTATION_INTERVAL_MS마다 다음 순위를 펼치므로 클라이언트 컴포넌트다.
 export default function RankingList({
-  platforms,
-  categories,
+  tabs,
   platform,
   category,
   rankings,
+  collectedAt,
 }: RankingListProps) {
-  const categoryPlatform = platform ?? platforms[0].slug;
-
   return (
     <main
       style={{
@@ -56,15 +56,23 @@ export default function RankingList({
         플랫폼별 트렌드 순위
       </h1>
 
+      {/* 수집 시각. 수집 전이면 글자 없이 자리만 남겨 탭 위치가 바뀌지 않게 한다. */}
+      <p style={{ minHeight: "1.5em", marginBottom: 20, textAlign: "right" }}>
+        {collectedAt && (
+          <time dateTime={collectedAt}>{formatCollectedAt(collectedAt)} 기준</time>
+        )}
+      </p>
+
       <nav aria-label="플랫폼">
         <ul style={{ display: "flex", flexWrap: "wrap", gap: 10, listStyle: "none" }}>
-          {platforms.map((item) => {
+          {tabs.platforms.map((item) => {
             const selected = item.slug === platform;
 
             return (
               <li key={item.slug}>
+                {/* 플랫폼을 바꿔도 고른 카테고리는 그대로 둔다. */}
                 <Link
-                  href={`/ranking/${item.slug}`}
+                  href={category ? `/ranking/${item.slug}/${category}` : `/ranking/${item.slug}`}
                   aria-current={selected ? "page" : undefined}
                   style={{
                     display: "block",
@@ -77,7 +85,7 @@ export default function RankingList({
                     fontSize: 18,
                   }}
                 >
-                  {item.name}
+                  {item.label}
                 </Link>
               </li>
             );
@@ -87,13 +95,13 @@ export default function RankingList({
 
       <nav aria-label="카테고리" style={{ marginTop: 10 }}>
         <ul style={{ display: "flex", flexWrap: "wrap", gap: 6, listStyle: "none" }}>
-          {categories.map((item) => {
+          {tabs.categories.map((item) => {
             const selected = item.slug === category;
 
             return (
-              <li key={item.slug}>
+              <li key={item.id}>
                 <Link
-                  href={`/ranking/${categoryPlatform}/${item.slug}`}
+                  href={`/ranking/${platform}/${item.slug}`}
                   aria-current={selected ? "page" : undefined}
                   style={{
                     display: "block",
@@ -112,7 +120,7 @@ export default function RankingList({
                     fontWeight: 700,
                   }}
                 >
-                  {item.name}
+                  {item.title}
                 </Link>
               </li>
             );
@@ -120,6 +128,45 @@ export default function RankingList({
         </ul>
       </nav>
 
+      {rankings.length === 0 ? (
+        <p style={{ marginTop: 40, textAlign: "center", fontSize: 16, color: "#555" }}>
+          아직 수집한 순위가 없습니다.
+        </p>
+      ) : (
+        // 플랫폼·카테고리를 바꾸면 1위 카드부터 다시 펼친다.
+        <RankingSections key={`${platform}/${category}`} rankings={rankings} />
+      )}
+    </main>
+  );
+}
+
+/** 2026-11-23T12:04:14 → 2026-11-23 12:04:14. 시간대 없는 시각이라 Date로 바꾸지 않고 글자만 바꾼다 */
+function formatCollectedAt(value: string): string {
+  return value.slice(0, 19).replace("T", " ");
+}
+
+function RankingSections({ rankings }: { rankings: Ranking[] }) {
+  // 펼친 카드의 순서(0부터). 카드는 한 번에 하나만 펼친다.
+  const [openIndex, setOpenIndex] = useState(0);
+  // 카드 위에 마우스가 있거나 키보드 포커스가 카드 안에 있으면 넘기지 않는다(읽거나 누르는 중에 접히지 않게).
+  const [hovered, setHovered] = useState(false);
+  const [keyboardFocused, setKeyboardFocused] = useState(false);
+  const paused = hovered || keyboardFocused;
+
+  // 펼친 카드가 바뀔 때마다(자동으로든 눌러서든) 10초를 새로 센다. 마지막 순위 다음은 1위로 돌아간다.
+  useEffect(() => {
+    if (paused || rankings.length < 2) {
+      return;
+    }
+    const timer = setTimeout(
+      () => setOpenIndex((index) => (index + 1) % rankings.length),
+      ROTATION_INTERVAL_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [openIndex, paused, rankings.length]);
+
+  return (
+    <>
       <section style={{ marginTop: 24 }}>
         <h2
           style={{
@@ -144,7 +191,7 @@ export default function RankingList({
         >
           {rankings.map((ranking) => (
             <li
-              key={ranking.rank}
+              key={ranking.id}
               style={{ display: "flex", alignItems: "baseline", gap: 16, fontSize: 22 }}
             >
               <span style={{ width: 32, fontSize: 28, fontWeight: 700 }}>
@@ -157,6 +204,15 @@ export default function RankingList({
       </section>
 
       <section
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        // 마우스로 누른 포커스는 멈추지 않고, 키보드(Tab)로 옮긴 포커스(:focus-visible)만 멈춘다.
+        onFocus={(event) => setKeyboardFocused(event.target.matches(":focus-visible"))}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            setKeyboardFocused(false);
+          }
+        }}
         style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 40 }}
       >
         <h2
@@ -171,19 +227,26 @@ export default function RankingList({
         >
           순위별 상세
         </h2>
-        {/* TODO: 로테이션 형태로 하나가 접히고 그 다음 하나가 펼쳐짐 */}
         {/* TODO: 차트 안에 채팅 들어감 */}
         {rankings.map((ranking, index) => {
-          // 처음 펼쳐진 카드는 요약 전체를, 접힌 카드는 한 줄만 보여 준다.
-          const open = index === 0;
+          // 펼친 카드는 요약 전체를, 접힌 카드는 한 줄만 보여 준다.
+          const open = index === openIndex;
 
           return (
             <details
-              key={ranking.rank}
+              key={ranking.id}
               open={open}
               style={{ padding: "24px 24px 28px", border: "1px solid #111" }}
             >
-              <summary style={{ listStyle: "none", cursor: "pointer" }}>
+              <summary
+                onClick={(event) => {
+                  // 브라우저 기본 동작(이 카드만 열고 닫기) 대신 누른 카드를 펼치고 나머지를 접는다.
+                  // 펼친 카드를 다시 눌러도 접지 않는다(항상 하나는 펼쳐 둔다).
+                  event.preventDefault();
+                  setOpenIndex(index);
+                }}
+                style={{ listStyle: "none", cursor: "pointer" }}
+              >
                 <span
                   style={{
                     display: "flex",
@@ -219,8 +282,8 @@ export default function RankingList({
                     AI 요약
                   </span>
                   <span
-                    style={
-                      open
+                    style={{
+                      ...(open
                         ? { fontSize: 18, lineHeight: 1.5 }
                         : {
                             minWidth: 0,
@@ -228,94 +291,36 @@ export default function RankingList({
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                             fontSize: 13,
-                          }
-                    }
+                          }),
+                      color: ranking.summary ? undefined : "#888",
+                    }}
                   >
-                    {ranking.summary}
+                    {ranking.summary ?? "AI 요약을 준비하고 있습니다."}
                   </span>
                 </span>
               </summary>
 
-              <h3
-                style={{
-                  display: "inline-block",
-                  marginTop: 18,
-                  padding: "2px 16px",
-                  border: "1px solid #111",
-                  fontSize: 16,
-                  fontWeight: 400,
-                }}
-              >
-                관련 링크
-              </h3>
-              {/* 관련 링크 썸네일은 그 플랫폼의 정책상 빠져야 하는 경우 뺀다. */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 20, marginTop: 16 }}>
-                <ul
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                    gap: 20,
-                    flex: 1,
-                    listStyle: "none",
-                  }}
-                >
-                  {ranking.links.map((link) => (
-                    <li key={link.id}>
-                      <div aria-hidden style={{ height: 100, background: "#d9d9d9" }} />
-                      <p
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "baseline",
-                          marginTop: 10,
-                        }}
-                      >
-                        <span style={{ fontSize: 14, fontWeight: 700 }}>{link.title}</span>
-                        <time style={{ fontSize: 11 }}>{link.date}</time>
-                      </p>
-                      <p style={{ marginTop: 6, fontSize: 11, color: "#555" }}>
-                        {link.description}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 8,
-                    marginTop: 30,
-                    border: "none",
-                    background: "none",
-                    fontSize: 15,
-                    cursor: "pointer",
-                  }}
-                >
-                  <span
-                    aria-hidden
+              {ranking.links.length > 0 && (
+                <>
+                  <h3
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 40,
-                      height: 40,
-                      border: "1px solid #999",
-                      borderRadius: "50%",
-                      background: "#f5f5f5",
-                      fontSize: 18,
+                      display: "inline-block",
+                      marginTop: 18,
+                      padding: "2px 16px",
+                      border: "1px solid #111",
+                      fontSize: 16,
+                      fontWeight: 400,
                     }}
                   >
-                    ›
-                  </span>
-                  더보기
-                </button>
-              </div>
+                    관련 링크
+                  </h3>
+                  <RankingLinks links={ranking.links} />
+                </>
+              )}
             </details>
           );
         })}
       </section>
-    </main>
+    </>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import styles from "@/app/_components/SiteHeader.module.css";
+import NotificationBell, { useUnreadCount } from "@/app/_components/NotificationBell";
 import { isAdminPath, isUnder, SITE_MENU } from "@/app/_components/siteMenu";
 import { apiFetch } from "@/lib/api/client";
 import type { LoginMember } from "@/lib/api/types";
@@ -13,6 +14,8 @@ import type { LoginMember } from "@/lib/api/types";
 // 현재 주소로 관리자 화면 여부와 선택된 메뉴를 정해야 해서 클라이언트 컴포넌트로 둔다.
 // 로그인했으면 로그인/회원가입 대신 닉네임과 로그아웃을 보인다.
 // 로그인 여부는 처음 그릴 때 한 번 /api/auth/me로 확인한다. 로그인·가입·로그아웃은 전체 이동을 하므로 그때 다시 확인된다.
+// 로그인했으면 알림(🔔, NotificationBell)도 보인다. 안 읽은 수(SSE 연결)는 여기서 한 번만 받아 두 🔔에 넘긴다.
+// 데스크톱·모바일 헤더를 둘 다 그리고 CSS로 하나를 숨기므로, 🔔마다 연결하면 탭 하나가 연결을 2개 연다.
 
 /** undefined: 확인 중, null: 로그인 안 함 */
 type LoginState = LoginMember | null | undefined;
@@ -63,6 +66,8 @@ function LogoutButton({ style }: { style?: CSSProperties }) {
 export default function SiteHeader() {
   const pathname = usePathname();
   const member = useLoginMember();
+  // 훅은 아래 return null보다 먼저 불러야 한다. 관리자 화면에서는 헤더가 없으므로 연결하지 않는다
+  const unread = useUnreadCount(Boolean(member) && !isAdminPath(pathname));
 
   if (isAdminPath(pathname)) {
     return null;
@@ -134,6 +139,7 @@ export default function SiteHeader() {
           >
             {member ? (
               <>
+                <NotificationBell unread={unread} />
                 <Link href="/mypage" style={{ fontSize: 13 }}>
                   {member.nickname}
                 </Link>
@@ -190,16 +196,17 @@ export default function SiteHeader() {
             trendizm
           </Link>
           {member === undefined ? null : member ? (
-            <LogoutButton
-              style={{
-                position: "absolute",
-                right: 10,
-                padding: "7px 12px",
-                border: "1px solid #999",
-                borderRadius: 3,
-                fontSize: 12,
-              }}
-            />
+            <div style={{ position: "absolute", right: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <NotificationBell unread={unread} />
+              <LogoutButton
+                style={{
+                  padding: "7px 12px",
+                  border: "1px solid #999",
+                  borderRadius: 3,
+                  fontSize: 12,
+                }}
+              />
+            </div>
           ) : (
             <Link
               href="/login"

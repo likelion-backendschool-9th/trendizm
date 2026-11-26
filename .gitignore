@@ -44,3 +44,6 @@ certs/
 # SQL 데이터 파일: data.sql은 각자 로컬용(data.example.sql을 복사해 쓴다), 테스트 데이터는 테스트 코드에서 직접 만든다
 /backend/src/main/resources/data.sql
 /backend/src/test/resources/test.sql
+
+# Python
+python/
