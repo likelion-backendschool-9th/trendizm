@@ -148,6 +148,16 @@ class MemeInterpretationVoteServiceTest {
     }
 
     @Test
+    @DisplayName("의견 하나의 myVote도 로그인한 사람의 투표만 보여 주고, 비로그인이면 null")
+    void 단건_내_투표() {
+        vote(VOTER, MemeVoteType.DISAGREE);
+
+        assertThat(interpretationService.getInterpretation(interpretationId, VOTER).myVote()).isEqualTo("disagree");
+        assertThat(interpretationService.getInterpretation(interpretationId, OTHER_VOTER).myVote()).isNull();
+        assertThat(interpretationService.getInterpretation(interpretationId, null).myVote()).isNull();
+    }
+
+    @Test
     @DisplayName("없는 의견이나 숨김 문서의 의견에는 투표·취소할 수 없다 (MEME_INTERPRETATION_NOT_FOUND)")
     void 투표_대상_없음() {
         for (Long id : List.of(-1L, hiddenInterpretationId)) {

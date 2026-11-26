@@ -41,6 +41,7 @@ class MemeInterpretationControllerTest {
     private static final String CREATE = "/api/lookup/interpretations";
     private static final String LIST = "/api/lookup/memes/{memeId}/interpretations";
     private static final String VOTE = "/api/lookup/interpretations/{interpretationId}/vote";
+    private static final String DETAIL = "/api/lookup/interpretations/{interpretationId}";
     private static final MemeInterpretationResponse INTERPRETATION = new MemeInterpretationResponse(
             1L, 3L, 7L, "밈장인", "알아서 잘 딱 깔끔하고 센스 있게", "내용", 0, 0, null, LocalDateTime.now(), LocalDateTime.now());
 
@@ -211,6 +212,48 @@ class MemeInterpretationControllerTest {
         mockMvc.perform(get(LIST, 3L).with(user(LOGIN_USER)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].myVote").value("agree"));
+    }
+
+    @Test
+    @DisplayName("의견 하나는 로그인 없이 볼 수 있다 (viewerId는 null)")
+    void 단건() throws Exception {
+        given(interpretationService.getInterpretation(1L, null)).willReturn(INTERPRETATION);
+
+        mockMvc.perform(get(DETAIL, 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.memeId").value(3))
+                .andExpect(jsonPath("$.authorNickname").value("밈장인"))
+                .andExpect(jsonPath("$.myVote").isEmpty());
+    }
+
+    @Test
+    @DisplayName("로그인하고 의견 하나를 보면 viewerId를 넘긴다 (myVote 표시용)")
+    void 로그인_단건() throws Exception {
+        given(interpretationService.getInterpretation(1L, 7L)).willReturn(INTERPRETATION.withMyVote("disagree"));
+
+        mockMvc.perform(get(DETAIL, 1L).with(user(LOGIN_USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.myVote").value("disagree"));
+    }
+
+    @Test
+    @DisplayName("없는 의견은 404 MEME_INTERPRETATION_NOT_FOUND")
+    void 없는_의견_단건() throws Exception {
+        given(interpretationService.getInterpretation(99L, null))
+                .willThrow(new BusinessException(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND));
+
+        mockMvc.perform(get(DETAIL, 99L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEME_INTERPRETATION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("의견 id가 숫자가 아니면 400 (서비스를 부르지 않는다)")
+    void 잘못된_의견_id() throws Exception {
+        mockMvc.perform(get(DETAIL, "abc"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(interpretationService);
     }
 
     @Test

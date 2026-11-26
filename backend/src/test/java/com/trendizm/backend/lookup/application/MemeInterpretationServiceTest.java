@@ -264,6 +264,39 @@ class MemeInterpretationServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("의견 하나를 작성자 닉네임과 함께 보여 주고, 없는 회원은 '탈퇴한 회원'으로 보여 준다")
+    void 단건_조회() {
+        MemeInterpretation mine = saveWithVotes(writer, "밈장인 의견", 3, 1);
+        MemeInterpretation unknown = saveWithVotes(UNKNOWN_USER, "탈퇴 회원 의견", 0, 0);
+
+        MemeInterpretationResponse found = interpretationService.getInterpretation(mine.getId(), null);
+
+        assertThat(found.id()).isEqualTo(mine.getId());
+        assertThat(found.memeId()).isEqualTo(tmi.getId());
+        assertThat(found.authorNickname()).isEqualTo("밈장인");
+        assertThat(found.meaning()).isEqualTo("밈장인 의견");
+        assertThat(found.agreeCount()).isEqualTo(3);
+        assertThat(found.disagreeCount()).isEqualTo(1);
+        assertThat(found.myVote()).isNull();
+        assertThat(interpretationService.getInterpretation(unknown.getId(), null).authorNickname())
+                .isEqualTo("탈퇴한 회원");
+    }
+
+    @Test
+    @DisplayName("없는 의견이나 숨김 문서의 의견은 하나만 볼 때도 MEME_INTERPRETATION_NOT_FOUND")
+    void 없는_의견_단건() {
+        MemeInterpretation inHidden =
+                interpretationRepository.save(MemeInterpretation.create(hidden.getId(), writer, "뜻", "내용"));
+
+        for (Long interpretationId : new Long[] {-1L, inHidden.getId()}) {
+            assertThatThrownBy(() -> interpretationService.getInterpretation(interpretationId, reader))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(MemeErrorCode.MEME_INTERPRETATION_NOT_FOUND);
+        }
+    }
+
     private MemeInterpretation saveWithVotes(String meaning, int agree, int disagree) {
         return saveWithVotes(writer, meaning, agree, disagree);
     }
