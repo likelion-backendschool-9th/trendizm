@@ -228,6 +228,9 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
           />
 
           <Comments
+            // 댓글 목록은 처음 받은 값을 상태에 담아 두므로, 토큰 재발급 뒤 다시 그려도 공감 여부가 그대로 남는다.
+            // 재발급 뒤 authExpired가 바뀌면 key가 바뀌어 새 목록으로 다시 시작한다.
+            key={`${question.id}-${authExpired ? "expired" : "viewer"}`}
             questionId={question.id}
             commentCount={question.commentCount}
             initialPage={comments}
