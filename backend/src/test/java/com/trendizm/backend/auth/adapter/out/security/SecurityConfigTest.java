@@ -14,6 +14,7 @@ import com.trendizm.backend.lookup.application.port.MemeThumbnailService;
 import com.trendizm.backend.notification.application.port.NotificationService;
 import com.trendizm.backend.point.application.port.PointService;
 import com.trendizm.backend.ranking.application.port.RankingService;
+import com.trendizm.backend.ranking.application.port.RankingSummaryService;
 import com.trendizm.backend.rating.application.port.RatingService;
 import java.util.List;
 import java.util.Map;
@@ -42,17 +43,18 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 class SecurityConfigTest {
 
     /** 컨트롤러 @RequestMapping 경로 → 로그인 없이 허용하면 true */
-    private static final Map<String, Boolean> ACCESS = Map.of(
-            "/api/auth", true,
-            "/api/feeds", true,
-            "/api/items", true,
-            "/api/lookup/comments", true,
-            "/api/lookup/interpretations", true,
-            "/api/lookup/memes", true,
-            "/api/rankings", true,
-            "/api/ratings", true,
-            "/api/notifications", false,
-            "/api/points", false);
+    private static final Map<String, Boolean> ACCESS = Map.ofEntries(
+            Map.entry("/api/auth", true),
+            Map.entry("/api/feeds", true),
+            Map.entry("/api/items", true),
+            Map.entry("/api/lookup/comments", true),
+            Map.entry("/api/lookup/interpretations", true),
+            Map.entry("/api/lookup/memes", true),
+            Map.entry("/api/rankings", true),
+            Map.entry("/api/ratings", true),
+            Map.entry("/api/notifications", false),
+            Map.entry("/api/points", false),
+            Map.entry("/api/admin/rankings", false));
 
     /** 가입·로그인·재발급·로그아웃은 로그인 전에 POST로 부르므로 쓰기 검사에서 뺀다 */
     private static final String AUTH = "/api/auth";
@@ -76,6 +78,7 @@ class SecurityConfigTest {
     @MockitoBean private NotificationService notificationService;
     @MockitoBean private PointService pointService;
     @MockitoBean private RankingService rankingService;
+    @MockitoBean private RankingSummaryService rankingSummaryService;
     @MockitoBean private RatingService ratingService;
 
     @Test

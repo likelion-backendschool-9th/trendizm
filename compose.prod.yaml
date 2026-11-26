@@ -76,7 +76,7 @@ services:
       TRENDIZM_JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       # 밈 문서 썸네일 저장 폴더. read_only라 아래 볼륨으로 붙인 곳에만 쓸 수 있다
       TRENDIZM_THUMBNAIL_DIR: /data/thumbnails
-      # 밈 의견 AI 요약(Gemini). 서버 .env의 GEMINI_API_KEY. 비어 있으면 요약 기능만 꺼진다
+      # 트렌드 순위, 밈 의견 AI 요약(Gemini). 서버 .env의 GEMINI_API_KEY. 비어 있으면 요약 기능만 꺼진다
       TRENDIZM_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       TZ: Asia/Seoul
     volumes:

@@ -25,11 +25,12 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /** 서비스가 의도해서 던진 예외 */
+    /** 서비스가 의도해서 던진 예외. 항목별 오류가 있으면 errors에 담는다 */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException e) {
         ErrorCode errorCode = e.getErrorCode();
-        return ResponseEntity.status(errorCode.status()).body(ErrorResponse.of(errorCode, e.getMessage()));
+        return ResponseEntity.status(errorCode.status())
+                .body(new ErrorResponse(errorCode.code(), e.getMessage(), e.getErrors()));
     }
 
     /** @Valid 요청 본문 검증 실패. 어떤 필드가 왜 틀렸는지 errors에 담는다 */
