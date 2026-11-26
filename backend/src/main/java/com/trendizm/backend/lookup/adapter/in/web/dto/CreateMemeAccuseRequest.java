@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * 밈 문서 신고. 예: { "reason": "hate", "description": "특정 지역을 비하하는 단어입니다." }
- * reason은 "sexual"(선정적), "hate"(혐오·비하), "ad"(광고), "etc"(기타). 기타면 description 필수.
+ * reason은 "sexual"(선정적), "hate"(혐오·비하), "ad"(광고), "false_info"(허위 정보), "etc"(기타). 기타면 description 필수.
  */
 public record CreateMemeAccuseRequest(
         @NotBlank(message = "신고 사유를 골라 주세요.")

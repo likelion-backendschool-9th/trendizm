@@ -7,7 +7,6 @@ import com.trendizm.backend.accuse.application.port.AccuseService;
 import com.trendizm.backend.accuse.application.port.out.AccuseRepository;
 import com.trendizm.backend.accuse.domain.entity.Accuse;
 import com.trendizm.backend.accuse.domain.enums.AccuseReason;
-import com.trendizm.backend.accuse.domain.enums.AccuseTarget;
 import com.trendizm.backend.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,8 +27,9 @@ public class AccuseServiceImpl implements AccuseService {
     @Override
     @Transactional
     public AccuseResponse accuse(CreateAccuseCommand command) {
-        AccuseTarget target = AccuseTarget.fromSlug(command.target())
-                .orElseThrow(() -> new IllegalArgumentException("없는 신고 대상 종류입니다: " + command.target()));
+        if (command.userId() != null && command.userId().equals(command.targetOwnerId())) {
+            throw new BusinessException(AccuseErrorCode.ACCUSE_OWN_TARGET);
+        }
         AccuseReason reason = AccuseReason.fromSlug(command.reason())
                 .orElseThrow(() -> new BusinessException(AccuseErrorCode.ACCUSE_INVALID_REASON));
         String description = Accuse.normalizeDescription(command.description());
@@ -39,12 +39,12 @@ public class AccuseServiceImpl implements AccuseService {
         if (description != null && description.length() > Accuse.MAX_DESCRIPTION_LENGTH) {
             throw new BusinessException(AccuseErrorCode.ACCUSE_DESCRIPTION_TOO_LONG);
         }
-        if (accuseRepository.existsByTargetAndTargetIdAndUserId(target, command.targetId(), command.userId())) {
+        if (accuseRepository.existsByTargetAndTargetIdAndUserId(command.target(), command.targetId(), command.userId())) {
             throw new BusinessException(AccuseErrorCode.ACCUSE_ALREADY_EXISTS);
         }
         try {
             Accuse saved = accuseRepository.saveAndFlush(
-                    Accuse.create(target, command.targetId(), command.userId(), reason, description));
+                    Accuse.create(command.target(), command.targetId(), command.userId(), reason, description));
             return AccuseResponse.from(saved);
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(AccuseErrorCode.ACCUSE_ALREADY_EXISTS);

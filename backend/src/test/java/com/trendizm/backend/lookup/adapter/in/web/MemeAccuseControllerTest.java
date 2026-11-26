@@ -34,7 +34,7 @@ class MemeAccuseControllerTest {
     private static final CustomUserDetails LOGIN_USER = new CustomUserDetails(7L, "member@test.com", "encoded", List.of());
     private static final String ACCUSE = "/api/lookup/memes/{memeId}/accuses";
     private static final AccuseResponse ACCUSED =
-            new AccuseResponse(1L, "meme", 3L, "hate", "비하 표현", LocalDateTime.now());
+            new AccuseResponse(1L, "hate", "비하 표현", LocalDateTime.now());
 
     @Autowired
     private MockMvc mockMvc;
@@ -54,9 +54,10 @@ class MemeAccuseControllerTest {
 
         mockMvc.perform(accuse(3L, "{\"reason\":\"hate\",\"description\":\"  비하 표현 \"}").with(user(LOGIN_USER)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.target").value("meme"))
-                .andExpect(jsonPath("$.targetId").value(3))
+                .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.reason").value("hate"))
+                .andExpect(jsonPath("$.target").doesNotExist())
+                .andExpect(jsonPath("$.targetId").doesNotExist())
                 .andExpect(jsonPath("$.userId").doesNotExist());
     }
 
@@ -103,10 +104,12 @@ class MemeAccuseControllerTest {
     }
 
     @Test
-    @DisplayName("서비스의 실패는 에러 코드대로 나간다: 없는 문서 404, 없는 사유·기타 내용 누락 400, 중복 409")
+    @DisplayName("서비스의 실패는 에러 코드대로 나간다: 없는 문서 404, 자기 문서·없는 사유·기타 내용 누락 400, 중복 409")
     void 서비스_실패() throws Exception {
         given(memeAccuseService.accuseMeme(new CreateMemeAccuseCommand(99L, 7L, "hate", null)))
                 .willThrow(new BusinessException(MemeErrorCode.MEME_NOT_FOUND));
+        given(memeAccuseService.accuseMeme(new CreateMemeAccuseCommand(4L, 7L, "hate", null)))
+                .willThrow(new BusinessException(AccuseErrorCode.ACCUSE_OWN_TARGET));
         given(memeAccuseService.accuseMeme(new CreateMemeAccuseCommand(3L, 7L, "spam", null)))
                 .willThrow(new BusinessException(AccuseErrorCode.ACCUSE_INVALID_REASON));
         given(memeAccuseService.accuseMeme(new CreateMemeAccuseCommand(3L, 7L, "etc", null)))
@@ -117,6 +120,9 @@ class MemeAccuseControllerTest {
         mockMvc.perform(accuse(99L, "{\"reason\":\"hate\"}").with(user(LOGIN_USER)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("MEME_NOT_FOUND"));
+        mockMvc.perform(accuse(4L, "{\"reason\":\"hate\"}").with(user(LOGIN_USER)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ACCUSE_OWN_TARGET"));
         mockMvc.perform(accuse(3L, "{\"reason\":\"spam\"}").with(user(LOGIN_USER)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("ACCUSE_INVALID_REASON"));

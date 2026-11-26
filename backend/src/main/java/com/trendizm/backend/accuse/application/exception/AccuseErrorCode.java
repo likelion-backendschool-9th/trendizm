@@ -6,8 +6,11 @@ import org.springframework.http.HttpStatus;
 /** 신고 도메인 에러. 예: throw new BusinessException(AccuseErrorCode.ACCUSE_ALREADY_EXISTS); */
 public enum AccuseErrorCode implements ErrorCode {
 
-    /** 신고 사유가 sexual, hate, ad, etc가 아님 */
-    ACCUSE_INVALID_REASON(HttpStatus.BAD_REQUEST, "신고 사유는 sexual, hate, ad, etc 중 하나여야 합니다."),
+    /** 신고 사유가 sexual, hate, ad, false_info, etc가 아님 */
+    ACCUSE_INVALID_REASON(HttpStatus.BAD_REQUEST, "신고 사유는 sexual, hate, ad, false_info, etc 중 하나여야 합니다."),
+
+    /** 자기가 쓴 글(대상의 작성자 = 신고한 회원)을 신고함 */
+    ACCUSE_OWN_TARGET(HttpStatus.BAD_REQUEST, "내가 쓴 글은 신고할 수 없습니다."),
 
     /** 사유가 기타인데 신고 내용이 비어 있음 */
     ACCUSE_DESCRIPTION_REQUIRED(HttpStatus.BAD_REQUEST, "기타 사유로 신고할 때는 신고 내용을 입력해 주세요."),

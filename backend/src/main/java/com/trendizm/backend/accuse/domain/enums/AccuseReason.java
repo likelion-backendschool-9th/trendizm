@@ -4,12 +4,17 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
 
-/** 신고 사유. 화면의 신고 모달에서 고른다. 요청·응답에는 slug(sexual, hate, ad, etc)로 주고받는다 */
+/**
+ * 신고 사유. 화면의 신고 모달에서 고른다. 요청·응답에는 slug(sexual, hate, ad, false_info, etc)로 주고받는다.
+ * 모든 도메인이 같은 목록을 쓴다. 운영 DB에 허용 값 CHECK가 생기므로 값을 추가하면 운영 DB도 직접 고쳐야 한다.
+ */
 public enum AccuseReason {
 
     SEXUAL("선정적"),
     HATE("혐오·비하"),
     AD("광고"),
+    /** 아이템 허위 정보, 밈의 틀린 뜻·출처 등 */
+    FALSE_INFO("허위 정보"),
     /** 기타. 신고 내용(description)이 필수다 */
     ETC("기타");
 

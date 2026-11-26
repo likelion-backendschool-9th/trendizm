@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 밈 문서 신고 API. 쓰기 요청이라 로그인이 필요하다 (auth/adapter/out/security/SecurityConfig).
- * 한 사람은 같은 문서를 한 번만 신고할 수 있다.
+ * 한 사람은 같은 문서를 한 번만 신고할 수 있고, 자기가 만든 문서는 신고할 수 없다.
  */
 @RestController
 @RequestMapping("/api/lookup")

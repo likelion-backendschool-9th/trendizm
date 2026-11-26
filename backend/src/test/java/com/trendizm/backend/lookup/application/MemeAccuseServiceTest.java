@@ -47,16 +47,15 @@ class MemeAccuseServiceTest {
     }
 
     @Test
-    @DisplayName("공개 문서를 신고하면 대상 종류 meme, 대상 id는 문서 id로 저장된다")
+    @DisplayName("공개 문서를 신고하면 대상은 memes 테이블(Meme.TABLE_NAME), 대상 id는 문서 id로 저장된다")
     void 문서_신고() {
         AccuseResponse saved =
                 memeAccuseService.accuseMeme(new CreateMemeAccuseCommand(tmi.getId(), USER, "hate", "비하 표현"));
 
-        assertThat(saved.target()).isEqualTo("meme");
-        assertThat(saved.targetId()).isEqualTo(tmi.getId());
+        assertThat(Meme.TABLE_NAME).isEqualTo("memes");
         assertThat(saved.reason()).isEqualTo("hate");
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM accuses WHERE target = 'MEME' AND target_id = ? AND user_id = ?",
+                "SELECT COUNT(*) FROM accuses WHERE target = 'memes' AND target_id = ? AND user_id = ?",
                 Long.class, tmi.getId(), USER)).isEqualTo(1);
     }
 
@@ -69,6 +68,18 @@ class MemeAccuseServiceTest {
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(MemeErrorCode.MEME_NOT_FOUND);
         }
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accuses", Long.class)).isZero();
+    }
+
+    @Test
+    @DisplayName("문서를 처음 만든 회원은 자기 문서를 신고할 수 없다 (ACCUSE_OWN_TARGET)")
+    void 자기_문서_신고() {
+        Long owner = tmi.getUserId();
+
+        assertThatThrownBy(() -> memeAccuseService.accuseMeme(new CreateMemeAccuseCommand(tmi.getId(), owner, "hate", null)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(AccuseErrorCode.ACCUSE_OWN_TARGET);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accuses", Long.class)).isZero();
     }
 

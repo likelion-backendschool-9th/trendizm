@@ -38,7 +38,7 @@ class AccuseConcurrencyTest {
     @Test
     @DisplayName("같은 사람이 같은 대상을 동시에 여러 번 신고해도 한 건만 저장되고, 나머지는 모두 ACCUSE_ALREADY_EXISTS")
     void 동시_중복_신고() throws Exception {
-        CreateAccuseCommand command = new CreateAccuseCommand("meme", 10L, 1L, "hate", null);
+        CreateAccuseCommand command = new CreateAccuseCommand("memes", 10L, 99L, 1L, "hate", null);
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(REQUESTS);
         try {

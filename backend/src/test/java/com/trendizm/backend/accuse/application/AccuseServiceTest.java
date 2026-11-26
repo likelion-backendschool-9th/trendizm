@@ -21,9 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class AccuseServiceTest {
 
+    private static final String TARGET = "memes";
     private static final Long MEME_ID = 10L;
     private static final Long USER = 1L;
     private static final Long OTHER_USER = 2L;
+    /** 신고 대상의 작성자 */
+    private static final Long OWNER = 99L;
 
     @Autowired
     private AccuseService accuseService;
@@ -32,23 +35,22 @@ class AccuseServiceTest {
     private JdbcTemplate jdbcTemplate;
 
     private static CreateAccuseCommand command(Long userId, String reason, String description) {
-        return new CreateAccuseCommand("meme", MEME_ID, userId, reason, description);
+        return new CreateAccuseCommand(TARGET, MEME_ID, OWNER, userId, reason, description);
     }
 
     @Test
-    @DisplayName("신고를 저장하고, 대상 종류·사유는 slug로 돌려준다. 처리 대기 중(closed_at null)으로 시작한다")
+    @DisplayName("신고를 저장하고 사유는 slug로 돌려준다. 대상 테이블·대상 id는 저장만 하고 응답에는 넣지 않는다. 처리 대기 중으로 시작한다")
     void 신고_저장() {
         AccuseResponse saved = accuseService.accuse(command(USER, "hate", "특정 지역을 비하하는 단어입니다."));
 
         assertThat(saved.id()).isNotNull();
-        assertThat(saved.target()).isEqualTo("meme");
-        assertThat(saved.targetId()).isEqualTo(MEME_ID);
         assertThat(saved.reason()).isEqualTo("hate");
         assertThat(saved.description()).isEqualTo("특정 지역을 비하하는 단어입니다.");
         assertThat(saved.createdAt()).isNotNull();
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT target || ',' || reason || ',' || user_id FROM accuses WHERE id = ?", String.class, saved.id()))
-                .isEqualTo("MEME,HATE," + USER);
+                "SELECT target || ',' || target_id || ',' || reason || ',' || user_id FROM accuses WHERE id = ?",
+                String.class, saved.id()))
+                .isEqualTo("memes," + MEME_ID + ",HATE," + USER);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT closed_at IS NULL FROM accuses WHERE id = ?", Boolean.class, saved.id())).isTrue();
     }
@@ -57,8 +59,28 @@ class AccuseServiceTest {
     @DisplayName("사유는 대소문자·앞뒤 공백을 무시하고, 기타가 아니면 내용 없이 신고할 수 있다")
     void 사유_slug() {
         assertThat(accuseService.accuse(command(USER, " SEXUAL ", null)).reason()).isEqualTo("sexual");
-        assertThat(accuseService.accuse(new CreateAccuseCommand("Meme", 11L, USER, "Ad", "   ")).description())
+        assertThat(accuseService.accuse(new CreateAccuseCommand(TARGET, 11L, OWNER, USER, "Ad", "   ")).description())
                 .isNull();
+    }
+
+    @Test
+    @DisplayName("허위 정보(false_info) 사유로 신고할 수 있다")
+    void 허위_정보() {
+        assertThat(accuseService.accuse(command(USER, "false_info", null)).reason()).isEqualTo("false_info");
+    }
+
+    @Test
+    @DisplayName("대상의 작성자가 자기 글을 신고하면 ACCUSE_OWN_TARGET이고 저장하지 않는다")
+    void 자기_글_신고() {
+        assertError(() -> accuseService.accuse(command(OWNER, "hate", null)), AccuseErrorCode.ACCUSE_OWN_TARGET);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accuses", Long.class)).isZero();
+    }
+
+    @Test
+    @DisplayName("작성자를 알 수 없는 대상(탈퇴 등으로 null)은 누구나 신고할 수 있다")
+    void 작성자_없는_대상() {
+        assertThat(accuseService.accuse(new CreateAccuseCommand(TARGET, MEME_ID, null, USER, "hate", null)).id())
+                .isNotNull();
     }
 
     @Test
@@ -89,15 +111,16 @@ class AccuseServiceTest {
     }
 
     @Test
-    @DisplayName("같은 사람이 같은 대상을 다시 신고하면 사유가 달라도 ACCUSE_ALREADY_EXISTS. 다른 사람·다른 대상은 신고할 수 있다")
+    @DisplayName("같은 사람이 같은 대상을 다시 신고하면 사유가 달라도 ACCUSE_ALREADY_EXISTS. 다른 사람·다른 대상·다른 테이블의 같은 id는 신고할 수 있다")
     void 중복_신고() {
         accuseService.accuse(command(USER, "hate", null));
 
         assertError(() -> accuseService.accuse(command(USER, "ad", null)), AccuseErrorCode.ACCUSE_ALREADY_EXISTS);
         accuseService.accuse(command(OTHER_USER, "hate", null));
-        accuseService.accuse(new CreateAccuseCommand("meme", MEME_ID + 1, USER, "hate", null));
+        accuseService.accuse(new CreateAccuseCommand(TARGET, MEME_ID + 1, OWNER, USER, "hate", null));
+        accuseService.accuse(new CreateAccuseCommand("ratings", MEME_ID, OWNER, USER, "hate", null));
 
-        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accuses", Long.class)).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accuses", Long.class)).isEqualTo(4);
     }
 
     @Test
@@ -110,10 +133,11 @@ class AccuseServiceTest {
     }
 
     @Test
-    @DisplayName("없는 대상 종류는 호출한 도메인의 잘못이라 IllegalArgumentException")
-    void 없는_대상_종류() {
-        assertThatThrownBy(() -> accuseService.accuse(new CreateAccuseCommand("item", MEME_ID, USER, "hate", null)))
+    @DisplayName("대상 테이블 이름이 비었으면 호출한 도메인의 잘못이라 IllegalArgumentException이고 저장하지 않는다")
+    void 빈_대상() {
+        assertThatThrownBy(() -> accuseService.accuse(new CreateAccuseCommand(" ", MEME_ID, OWNER, USER, "hate", null)))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accuses", Long.class)).isZero();
     }
 
     private static void assertError(ThrowingCallable call, ErrorCode errorCode) {

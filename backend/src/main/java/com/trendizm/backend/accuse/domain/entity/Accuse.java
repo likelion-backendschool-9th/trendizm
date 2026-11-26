@@ -1,7 +1,6 @@
 package com.trendizm.backend.accuse.domain.entity;
 
 import com.trendizm.backend.accuse.domain.enums.AccuseReason;
-import com.trendizm.backend.accuse.domain.enums.AccuseTarget;
 import com.trendizm.backend.global.entity.BaseCreatedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,7 +19,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 신고. 밈·평점·아이템 등 여러 도메인이 같이 쓰는 공용 테이블이라 대상은 target(종류) + target_id로 가리킨다(FK 없음).
+ * 신고. 밈·평점·아이템 등 여러 도메인이 같이 쓰는 공용 테이블이라 대상은 target(대상 테이블 이름) + target_id로 가리킨다(FK 없음).
+ * target은 enum이 아니라 각 도메인 엔티티의 테이블 이름 상수(예: Meme.TABLE_NAME = "memes")다. 대상이 늘어도 accuse는 바뀌지 않고,
+ * 값 목록 CHECK 제약도 생기지 않는다.
  * 대상이 있는지는 신고를 받는 도메인이 확인한 뒤 저장한다. 한 사람은 같은 대상을 한 번만 신고할 수 있다.
  * closed_at이 null이면 처리 대기 중이고, 관리자가 처리하면 처리 시각을 채운다(행은 지우지 않는다).
  */
@@ -33,6 +34,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Accuse extends BaseCreatedEntity {
 
+    /** target 칼럼 길이 */
+    public static final int MAX_TARGET_LENGTH = 30;
+
     /** description 칼럼 길이 */
     public static final int MAX_DESCRIPTION_LENGTH = 500;
 
@@ -40,11 +44,11 @@ public class Accuse extends BaseCreatedEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private AccuseTarget target;
+    /** 신고 대상 테이블 이름. 예: "memes" */
+    @Column(nullable = false, length = MAX_TARGET_LENGTH)
+    private String target;
 
-    /** 신고 대상 id. target이 MEME이면 memes.id */
+    /** 신고 대상 id. target이 memes면 memes.id */
     @Column(name = "target_id", nullable = false)
     private Long targetId;
 
@@ -64,7 +68,7 @@ public class Accuse extends BaseCreatedEntity {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
-    private Accuse(AccuseTarget target, Long targetId, Long userId, AccuseReason reason, String description) {
+    private Accuse(String target, Long targetId, Long userId, AccuseReason reason, String description) {
         this.target = target;
         this.targetId = targetId;
         this.userId = userId;
@@ -73,9 +77,11 @@ public class Accuse extends BaseCreatedEntity {
     }
 
     /** 내용 검사(기타면 필수 등)는 서비스에서 한다. 여기서는 빈 내용을 null로만 바꾼다 */
-    public static Accuse create(AccuseTarget target, Long targetId, Long userId, AccuseReason reason,
+    public static Accuse create(String target, Long targetId, Long userId, AccuseReason reason,
                                 String description) {
-        Objects.requireNonNull(target, "신고 대상 종류는 필수입니다");
+        if (target == null || target.isBlank() || target.length() > MAX_TARGET_LENGTH) {
+            throw new IllegalArgumentException("신고 대상 테이블 이름은 1~30자여야 합니다: " + target);
+        }
         Objects.requireNonNull(targetId, "신고 대상 id는 필수입니다");
         Objects.requireNonNull(userId, "신고한 회원 id는 필수입니다");
         Objects.requireNonNull(reason, "신고 사유는 필수입니다");
