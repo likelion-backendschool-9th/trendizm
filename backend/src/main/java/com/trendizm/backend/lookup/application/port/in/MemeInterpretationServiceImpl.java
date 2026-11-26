@@ -132,6 +132,16 @@ public class MemeInterpretationServiceImpl implements MemeInterpretationService 
                         .withMyVote(myVotes.get(interpretation.getId())));
     }
 
+    @Override
+    public MemeInterpretationResponse getInterpretation(Long interpretationId, Long viewerId) {
+        MemeInterpretation interpretation = getVisibleInterpretation(interpretationId);
+        Long id = interpretation.getId();
+        Long userId = interpretation.getUserId();
+        return MemeInterpretationResponse.from(interpretation)
+                .withAuthor(nicknames(Set.of(userId)).get(userId))
+                .withMyVote(myVotes(viewerId, List.of(id)).get(id));
+    }
+
     /**
      * 투표 수는 실제로 바뀐 행이 있을 때만 고친다(insertIfAbsent·changeType의 반환값).
      * 그래서 같은 사람이 동시에 여러 번 보내도 수가 한 번만 바뀐다.

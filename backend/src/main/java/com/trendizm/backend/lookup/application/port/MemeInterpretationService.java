@@ -28,6 +28,12 @@ public interface MemeInterpretationService {
     PageResponse<MemeInterpretationResponse> getInterpretations(Long memeId, Long viewerId, int page, int size);
 
     /**
+     * 의견 하나 (의견 상세 화면·알림 이동용). 의견이 없거나 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND.
+     * viewerId는 로그인한 사용자 id(myVote 표시용)이고 비로그인이면 null
+     */
+    MemeInterpretationResponse getInterpretation(Long interpretationId, Long viewerId);
+
+    /**
      * 의견에 투표한다. 처음이면 저장하고, 다른 쪽에 투표해 두었으면 바꾸고, 같은 쪽이면 바뀌는 것이 없다.
      * 자기 의견에도 투표할 수 있다. 의견이 없거나 문서가 숨김이면 MEME_INTERPRETATION_NOT_FOUND.
      * 결과의 수와 myVote는 처리 후 DB에서 읽은 값이다

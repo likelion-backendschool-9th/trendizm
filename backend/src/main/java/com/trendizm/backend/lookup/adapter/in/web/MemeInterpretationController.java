@@ -52,6 +52,14 @@ public class MemeInterpretationController {
         return interpretationService.getInterpretations(memeId, viewerId, page, size);
     }
 
+    /** 의견 하나 (의견 상세 화면·알림 이동용). 로그인했으면 내 투표(myVote)가 들어간다 */
+    @GetMapping("/interpretations/{interpretationId}")
+    public MemeInterpretationResponse getInterpretation(
+            @PathVariable Long interpretationId,
+            @AuthenticationPrincipal(expression = OPTIONAL_USER_ID) Long viewerId) {
+        return interpretationService.getInterpretation(interpretationId, viewerId);
+    }
+
     /** 고른 문서에 의견 작성 */
     @PostMapping("/memes/{memeId}/interpretations")
     @ResponseStatus(HttpStatus.CREATED)
