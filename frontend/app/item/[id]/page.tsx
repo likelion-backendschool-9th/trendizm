@@ -6,7 +6,7 @@ import Recommendations from "@/app/item/[id]/_components/Recommendations";
 import RefreshAfterReissue from "@/app/item/_components/RefreshAfterReissue";
 import ShareButton from "@/app/item/[id]/_components/ShareButton";
 import { findCategory } from "@/app/item/_lib/categories";
-import { accessTokenExpired, fetchAsViewer } from "@/app/item/_lib/fetchAsViewer";
+import { fetchAsViewer, renderedAsGuest } from "@/app/item/_lib/fetchAsViewer";
 import { answerLabel, formatDate } from "@/app/item/_lib/format";
 import type {
   ItemAdjacentQuestions,
@@ -50,7 +50,7 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
     throw error;
   }
 
-  const [recommendations, comments, similar, adjacent, authExpired] = await Promise.all([
+  const [recommendations, comments, similar, adjacent, asGuest] = await Promise.all([
     fetchAsViewer<ItemRecommendation[]>(`/api/items/${id}/recommendations`),
     fetchAsViewer<PageResponse<ItemComment>>(
       `/api/items/${id}/comments?page=0&size=${COMMENT_PAGE_SIZE}`,
@@ -59,7 +59,7 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
       `/api/items?subcategory=${question.subcategory.slug}&size=${SIMILAR_SIZE + 1}`,
     ),
     serverFetch<ItemAdjacentQuestions>(`/api/items/${id}/adjacent`),
-    accessTokenExpired(),
+    renderedAsGuest(),
   ]);
   const similarQuestions = similar.content
     .filter((other) => other.id !== question.id)
@@ -77,8 +77,8 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
         color: "#111",
       }}
     >
-      {/* 액세스 토큰만 만료돼 로그인하지 않은 사람 기준으로 그렸으면, 브라우저에서 재발급한 뒤 다시 그린다 */}
-      {authExpired && <RefreshAfterReissue />}
+      {/* 액세스 토큰 없이 그렸으면, 브라우저에서 로그인을 확인(필요하면 재발급)한 뒤 로그인 상태면 다시 그린다 */}
+      {asGuest && <RefreshAfterReissue />}
       <div
         style={{
           display: "flex",
@@ -229,8 +229,8 @@ async function ItemDetail({ params }: Pick<PageProps<"/item/[id]">, "params">) {
 
           <Comments
             // 댓글 목록은 처음 받은 값을 상태에 담아 두므로, 토큰 재발급 뒤 다시 그려도 공감 여부가 그대로 남는다.
-            // 재발급 뒤 authExpired가 바뀌면 key가 바뀌어 새 목록으로 다시 시작한다.
-            key={`${question.id}-${authExpired ? "expired" : "viewer"}`}
+            // 재발급 뒤 asGuest가 바뀌면 key가 바뀌어 새 목록으로 다시 시작한다.
+            key={`${question.id}-${asGuest ? "guest" : "viewer"}`}
             questionId={question.id}
             commentCount={question.commentCount}
             initialPage={comments}
