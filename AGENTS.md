@@ -33,7 +33,7 @@ Spring Boot 4와 Next.js 16은 이전 버전과 API가 다르다. 이전 버전 
 
 ## 백엔드 구조 (헥사고날)
 
-도메인 패키지(`auth`, `feed`, `item`, `lookup`, `notification`, `ranking`, `rating`)마다 같은 구조를 따른다. `feed`를 예로 들면:
+도메인 패키지(`accuse`, `auth`, `feed`, `item`, `lookup`, `notification`, `ranking`, `rating`)마다 같은 구조를 따른다. `feed`를 예로 들면:
 
 ```
 com.trendizm.backend.feed

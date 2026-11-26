@@ -33,11 +33,14 @@ import org.hibernate.annotations.DynamicUpdate;
  */
 @Entity
 @DynamicUpdate
-@Table(name = "memes",
+@Table(name = Meme.TABLE_NAME,
         uniqueConstraints = @UniqueConstraint(name = "uk_memes_word_source_url", columnNames = {"word", "source_url"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Meme extends BaseCreatedEntity {
+
+    /** 테이블 이름. 신고(accuses.target)에도 이 값을 대상 종류로 넘긴다 */
+    public static final String TABLE_NAME = "memes";
 
     /** word 칼럼 길이. normalizeWord로 바꾼 뒤의 길이를 이 값으로 확인한다 */
     public static final int MAX_WORD_LENGTH = 100;
