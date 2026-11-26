@@ -171,7 +171,7 @@ cd trendizm
 
 cp .env.example .env
 cp compose.override.example.yaml compose.override.yaml
-cp backend/src/main/resources/application-example.yml backend/src/main/resources/application.yml
+cp backend/src/main/resources/application-example.yml backend/src/main/resources/application-local.yml
 cp backend/src/main/resources/data.example.sql backend/src/main/resources/data.sql
 ```
 
@@ -203,10 +203,10 @@ docker compose up
 
 ```bash
 cd backend
-./gradlew bootRun
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 ```
 
-Windows에서는 `gradlew.bat bootRun`을 실행합니다.
+`local` 프로필로 실행해야 `application-local.yml`과 루트 `.env`의 값을 읽습니다. `application-local.yml`은 1단계에서 `application-example.yml`을 복사해 만든 파일이며, 복사하지 않고 `application-example.yml`을 참고해 직접 작성해도 됩니다. Windows에서는 `gradlew.bat bootRun --args="--spring.profiles.active=local"`을 실행합니다.
 
 #### 4. 프론트엔드 실행
 
